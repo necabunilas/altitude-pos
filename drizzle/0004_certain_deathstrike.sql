@@ -1,0 +1,1 @@
+ALTER TABLE `orders` ADD `closed_at` integer;

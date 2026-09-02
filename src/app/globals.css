@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+:root {
+  /* Altitude PH brand theme; stark white base with near-black ink text. */
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-montserrat);
+  --font-mono: var(--font-montserrat);
+  --font-display: var(--font-montserrat), -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-script: var(--font-montserrat), -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Altitude PH brand palette (gold / wine / teal on off-white & charcoal),
+     mapped onto the original semantic token names so every component keeps
+     working: neutrals -> off-white/white/gray, darks -> charcoal/black,
+     accents -> gold, secondary -> teal, deep accent -> wine. */
+  --color-cream: #ffffff;
+  --color-ivory: #ffffff;
+  --color-sand: #e5e5e5;
+  --color-espresso: #0a0a0a;
+  --color-espresso-light: #1f1f1f;
+  --color-mocha: #0e4b4a;
+  --color-brass: #e0a55b;
+  --color-brass-dark: #c98b3d;
+  --color-honey: #e0a55b;
+  --color-sage: #5a0f2e;
+  --color-ink: #0a0a0a;
+}
+
+/* The app uses a fixed light brand theme; do not invert on OS dark mode. */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-montserrat), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Punched-style feel: section headings render as punchy, all-caps, ultra-bold
+   marks with tight tracking. Applied globally so every `font-display` heading
+   across the guest and staff screens shares the same bold identity. */
+.font-display {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Horizontal category rail scrolls without a visible scrollbar. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* iOS Safari zooms in when a focused form control has font-size < 16px.
+   Force at least 16px on touch-sized screens so focusing an input/textarea
+   doesn't jump-zoom the page. */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* When printing a receipt, hide everything except the receipt itself. The
+   printable receipt is marked with .receipt-printable; .no-print is stripped. */
+@media print {
+  /* 80mm thermal roll, continuous length, no printer margins. */
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .receipt-printable,
+  .receipt-printable * {
+    visibility: visible;
+  }
+  .receipt-printable {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    max-width: none; /* override the on-screen max-width */
+    padding: 3mm 2.5mm;
+    margin: 0;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

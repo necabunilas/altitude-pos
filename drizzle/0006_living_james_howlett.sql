@@ -1,0 +1,1 @@
+ALTER TABLE `feedback` ADD `name` text DEFAULT '' NOT NULL;

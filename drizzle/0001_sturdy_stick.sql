@@ -1,0 +1,1 @@
+ALTER TABLE `orders` ADD `paid_at` integer;

@@ -1,0 +1,28 @@
+{
+  "name": "silent-order-altitude",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:seed": "node src/db/seed.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "drizzle-orm": "^0.45.2",
+    "next": "16.3.0",
+    "qrcode": "^1.5.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "^4"
+  }
+}
