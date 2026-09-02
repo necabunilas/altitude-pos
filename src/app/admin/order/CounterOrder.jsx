@@ -116,13 +116,7 @@ export default function CounterOrder({ menu }) {
 
       {visible.map((cat) => (
         <div key={cat.id} className="mb-6">
-          <div className="flex items-center gap-3 mb-3">
-            <h2 className="font-display text-xl text-espresso">{cat.name}</h2>
-            <span className="text-[11px] font-black text-white bg-mocha px-2 py-0.5">
-              {cat.items.length}
-            </span>
-            <span className="h-0.5 flex-1 bg-sand" />
-          </div>
+          <h2 className="font-display text-xl text-espresso mb-3">{cat.name}</h2>
           <div className="grid gap-2 sm:grid-cols-2">
             {cat.items.map((it) => {
               const qty = cart[it.id] || 0;
