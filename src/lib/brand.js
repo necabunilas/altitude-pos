@@ -6,7 +6,7 @@ export const RESTAURANT_TAGLINE =
 
 export const SOCIAL = {
   facebook: "https://www.facebook.com/altitudecoffeeph",
-  instagram: "https://www.instagram.com/altitudecoffeeph",
+  instagram: "https://www.instagram.com/altitude.ph/",
 };
 
 // Developer credit shown in the footer (per the development agreement).
