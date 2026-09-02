@@ -271,9 +271,6 @@ export default function CustomerApp({ slug, table, menu }) {
           <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-16">
             <div className="flex items-center gap-3 mt-8 mb-1">
               <h2 className="font-display text-espresso text-2xl">{cat.name}</h2>
-              <span className="text-[11px] font-black text-white bg-mocha px-2 py-0.5">
-                {cat.items.length}
-              </span>
               <span className="h-0.5 flex-1 bg-sand" />
             </div>
             <div className="divide-y divide-sand">
