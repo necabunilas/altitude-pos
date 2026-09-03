@@ -60,43 +60,54 @@ export async function placeOrder({ tableId, cart, note = "" }) {
 
   if (!lines.length) throw new Error("No valid items in cart");
 
-  // One active order per table: if the table already has an open (unpaid,
+  // One active order per table, enforced by a unique partial index
+  // (orders_one_open_per_table). If the table already has an open (unpaid,
   // non-cancelled) order, append the new items to it instead of creating a
-  // second order. Only start a new order once the previous one is settled.
-  const active = await listOrders({ activeOnly: true });
-  const existing = active.find((o) => o.tableId === tableId);
+  // second one. The loop makes this race-safe: if a concurrent request wins
+  // the insert, our insert hits the unique constraint and we retry — this time
+  // finding the now-existing order and appending to it.
+  for (let attempt = 0; ; attempt++) {
+    const active = await listOrders({ activeOnly: true });
+    const existing = active.find((o) => o.tableId === tableId);
 
-  if (existing) {
-    // Once the bill is paid, no more items can be added to this order.
-    if (existing.paidAt) {
-      throw new Error("This order is already paid.");
+    if (existing) {
+      // Once the bill is paid, no more items can be added to this order.
+      if (existing.paidAt) {
+        throw new Error("This order is already paid.");
+      }
+      // Append the new items to the table's open order (one eating session).
+      // Newly added items start as "placed"; already-served items keep status.
+      await db
+        .insert(orderItems)
+        .values(lines.map((l) => ({ ...l, orderId: existing.id, status: "placed" })))
+        .run();
+      const cleanNote = String(note || "").trim();
+      if (cleanNote) {
+        const merged = ((existing.note ? existing.note + " | " : "") + cleanNote).slice(0, 300);
+        await db.update(orders).set({ note: merged }).where(eq(orders.id, existing.id)).run();
+      }
+      return { id: existing.id, appended: true };
     }
-    // Append the new items to the table's open order (one eating session).
-    // Newly added items start as "placed"; already-served items keep status.
-    await db
-      .insert(orderItems)
-      .values(lines.map((l) => ({ ...l, orderId: existing.id, status: "placed" })))
-      .run();
-    const cleanNote = String(note || "").trim();
-    if (cleanNote) {
-      const merged = ((existing.note ? existing.note + " | " : "") + cleanNote).slice(0, 300);
-      await db.update(orders).set({ note: merged }).where(eq(orders.id, existing.id)).run();
+
+    try {
+      const order = await db
+        .insert(orders)
+        .values({ tableId, note: String(note || "").slice(0, 300) })
+        .returning()
+        .get();
+
+      await db
+        .insert(orderItems)
+        .values(lines.map((l) => ({ ...l, orderId: order.id, status: "placed" })))
+        .run();
+
+      return order;
+    } catch (e) {
+      // Lost the race to open the table's order — retry to append to it.
+      if (attempt < 2 && /UNIQUE constraint failed/i.test(String(e?.message))) continue;
+      throw e;
     }
-    return { id: existing.id, appended: true };
   }
-
-  const order = await db
-    .insert(orders)
-    .values({ tableId, note: String(note || "").slice(0, 300) })
-    .returning()
-    .get();
-
-  await db
-    .insert(orderItems)
-    .values(lines.map((l) => ({ ...l, orderId: order.id, status: "placed" })))
-    .run();
-
-  return order;
 }
 
 // Derived order status from its per-item statuses (cancelled stays cancelled).
