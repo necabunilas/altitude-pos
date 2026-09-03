@@ -81,17 +81,24 @@ export default function MenuManager({ initialMenu }) {
                 <EditPrice item={item} onDone={reload} />
                 <button
                   onClick={() => toggle(item)}
-                  className={`text-xs px-2 py-1 rounded-full ${
+                  title={item.available ? "Tap to hide from menu" : "Tap to make available"}
+                  className={`inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide px-2.5 py-1 border transition-colors ${
                     item.available
-                      ? "bg-emerald-100 text-emerald-800"
-                      : "bg-neutral-200 text-mocha"
+                      ? "border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white"
+                      : "border-neutral-300 text-mocha/70 hover:bg-neutral-200"
                   }`}
                 >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      item.available ? "bg-emerald-500" : "bg-neutral-400"
+                    }`}
+                  />
                   {item.available ? "Available" : "Hidden"}
                 </button>
                 <button
                   onClick={() => remove(item)}
-                  className="text-neutral-300 hover:text-red-600 text-lg leading-none"
+                  title="Delete item"
+                  className="w-7 h-7 grid place-items-center border border-transparent text-neutral-300 hover:text-red-600 hover:border-red-200 text-lg leading-none transition-colors"
                 >
                   ×
                 </button>
@@ -190,21 +197,37 @@ function EditPrice({ item, onDone }) {
 
   if (!editing) {
     return (
-      <button onClick={() => setEditing(true)} className="text-xs text-mocha/70 hover:text-neutral-900">
-        edit ₱
+      <button
+        onClick={() => setEditing(true)}
+        title="Edit price"
+        className="text-[11px] font-black uppercase tracking-wide px-2.5 py-1 border border-ink text-ink hover:bg-ink hover:text-white transition-colors"
+      >
+        Edit ₱
       </button>
     );
   }
   return (
-    <span className="flex items-center gap-1">
+    <span className="inline-flex items-center">
       <input
         value={price}
         onChange={(e) => setPrice(e.target.value)}
         inputMode="decimal"
-        className="border border-ink px-1 py-0.5 text-sm w-20 focus:outline-none focus:border-brass"
+        autoFocus
+        className="border border-ink border-r-0 px-2 py-1 text-sm w-20 focus:outline-none focus:border-brass"
       />
-      <button onClick={save} className="text-xs bg-ink text-white px-2 py-1 hover:bg-espresso-light transition-colors">
+      <button
+        onClick={save}
+        title="Save price"
+        className="text-xs bg-ink text-white font-black px-2.5 py-1.5 leading-none hover:bg-espresso-light transition-colors"
+      >
         ✓
+      </button>
+      <button
+        onClick={() => setEditing(false)}
+        title="Cancel"
+        className="text-mocha/60 hover:text-red-600 text-lg leading-none px-1.5 transition-colors"
+      >
+        ×
       </button>
     </span>
   );
