@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPeso } from "@/lib/money";
+import { formatPeso, groupItems } from "@/lib/money";
 import { RECEIPT_BUSINESS, VAT_RATE } from "@/lib/brand";
 
 // A single-order receipt, styled like a thermal-printer slip. Wrap in
@@ -54,8 +54,8 @@ export default function Receipt({ order, printable = true }) {
       <Rule />
 
       <div className="space-y-1">
-        {order.items.map((it) => (
-          <div key={it.id}>
+        {groupItems(order.items).map((it) => (
+          <div key={it.key}>
             <div className="flex justify-between">
               <span className="pr-2">
                 {it.qty}× {it.name}
@@ -64,7 +64,6 @@ export default function Receipt({ order, printable = true }) {
             </div>
             <div className="text-[10px] text-neutral-500 pl-3">
               @ {formatPeso(it.priceCents)}
-              {it.note ? ` · ${it.note}` : ""}
             </div>
           </div>
         ))}

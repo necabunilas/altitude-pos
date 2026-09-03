@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatPeso } from "@/lib/money";
+import { formatPeso, groupItems } from "@/lib/money";
 import { RESTAURANT_NAME, VAT_RATE } from "@/lib/brand";
 import { TERMINAL_ENABLED } from "@/lib/flags";
 import Footer from "@/app/Footer";
@@ -185,7 +185,7 @@ export default function CustomerApp({ slug, table, menu }) {
 
   // On-screen bill: every unpaid line across the table's active orders, plus a
   // VAT-inclusive breakdown, so guests can review the bill without a printout.
-  const billItems = myOrders.flatMap((o) => o.items || []);
+  const billItems = groupItems(myOrders.flatMap((o) => o.items || []));
   const vatSales = Math.round(myTotal / (1 + VAT_RATE));
   const vatAmount = myTotal - vatSales;
 
@@ -410,7 +410,7 @@ export default function CustomerApp({ slug, table, menu }) {
               </div>
               <div className="p-3 space-y-1.5 text-sm">
                 {billItems.map((it) => (
-                  <div key={it.id} className="flex justify-between gap-2">
+                  <div key={it.key} className="flex justify-between gap-2">
                     <span className="flex-1">
                       <span className="font-medium">{it.qty}×</span> {it.name}
                     </span>
