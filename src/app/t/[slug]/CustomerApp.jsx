@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatPeso } from "@/lib/money";
-import { RESTAURANT_NAME } from "@/lib/brand";
+import { RESTAURANT_NAME, VAT_RATE } from "@/lib/brand";
+import { TERMINAL_ENABLED } from "@/lib/flags";
 import Footer from "@/app/Footer";
 import { Star } from "@/app/Stars";
 
@@ -140,7 +141,53 @@ export default function CustomerApp({ slug, table, menu }) {
     await call("bill", method);
   }
 
+  // Start an in-app Maya card payment: create a hosted checkout for this
+  // table's unpaid total, then send the browser to Maya. On return, the
+  // callback redirects back here with ?pay=done|failed (handled below).
+  async function payByCard() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/pay/${encodeURIComponent(slug)}`, { method: "POST" });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.redirectUrl) {
+        window.location.href = d.redirectUrl;
+      } else {
+        show(d.error || "Couldn't start card payment. Try again.", "err");
+        setBusy(false);
+      }
+    } catch {
+      show("No connection. Please try again.", "err");
+      setBusy(false);
+    }
+  }
+
+  // Handle the return trip from Maya's hosted checkout. The callback appends
+  // ?pay=done (verified paid) or ?pay=failed; show feedback and strip the param
+  // so a refresh doesn't repeat it. Paid state itself arrives via the poll.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pay = params.get("pay");
+    if (!pay) return;
+    if (pay === "done") {
+      setBillOpen(false);
+      show("Payment received. Thank you!");
+      loadMyOrders();
+    } else if (pay === "failed") {
+      show("Payment was not completed.", "err");
+    }
+    params.delete("pay");
+    const qs = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+  }, [loadMyOrders]);
+
   const st = order ? ORDER_STATUS[order.status] || ORDER_STATUS.placed : null;
+
+  // On-screen bill: every unpaid line across the table's active orders, plus a
+  // VAT-inclusive breakdown, so guests can review the bill without a printout.
+  const billItems = myOrders.flatMap((o) => o.items || []);
+  const vatSales = Math.round(myTotal / (1 + VAT_RATE));
+  const vatAmount = myTotal - vatSales;
 
   return (
     <div className="min-h-screen bg-cream text-ink flex flex-col">
@@ -243,7 +290,7 @@ export default function CustomerApp({ slug, table, menu }) {
         <QuickAction icon="🙋" label="Call barista" onClick={() => call("waiter")} />
         <QuickAction
           icon="🧾"
-          label={paid ? "Bill paid" : "Ask for bill"}
+          label={paid ? "Bill paid" : "View bill"}
           onClick={() => setBillOpen(true)}
           disabled={!order || paid}
         />
@@ -352,30 +399,85 @@ export default function CustomerApp({ slug, table, menu }) {
       )}
 
       {billOpen && (
-        <Sheet title="Request the bill" onClose={() => setBillOpen(false)}>
-          <p className="text-sm text-mocha mb-3">How will you pay? Staff will bring your bill.</p>
-          {order && (
-            <div className="flex items-center justify-between mb-3 text-sm">
-              <span className="text-mocha">Your total</span>
-              <span className="font-semibold text-lg">{formatPeso(myTotal)}</span>
+        <Sheet title="Your bill" onClose={() => setBillOpen(false)}>
+          {order ? (
+            <div className="border border-ink mb-4">
+              <div className="px-3 py-2 border-b border-sand text-center">
+                <div className="font-black uppercase tracking-wide text-sm">{RESTAURANT_NAME}</div>
+                <div className="text-[11px] text-mocha">
+                  {table.label} · Order #{order.id}
+                </div>
+              </div>
+              <div className="p-3 space-y-1.5 text-sm">
+                {billItems.map((it) => (
+                  <div key={it.id} className="flex justify-between gap-2">
+                    <span className="flex-1">
+                      <span className="font-medium">{it.qty}×</span> {it.name}
+                    </span>
+                    <span className="tabular-nums">
+                      {formatPeso(it.priceCents * it.qty)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-dashed border-sand px-3 py-2 text-xs text-mocha space-y-0.5">
+                <div className="flex justify-between">
+                  <span>VATable sales</span>
+                  <span className="tabular-nums">{formatPeso(vatSales)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>VAT (12%)</span>
+                  <span className="tabular-nums">{formatPeso(vatAmount)}</span>
+                </div>
+              </div>
+              <div className="border-t border-ink px-3 py-2.5 flex justify-between items-center">
+                <span className="font-black uppercase tracking-wide text-sm">Total</span>
+                <span className="font-black text-xl">{formatPeso(myTotal)}</span>
+              </div>
             </div>
+          ) : (
+            <p className="text-mocha mb-4">No active order yet. Order something first.</p>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => askBill("cash")}
-              className="border-2 border-ink bg-white py-6 active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
-            >
-              <div className="text-2xl">💵</div>
-              <div className="mt-1.5 font-black uppercase tracking-wide text-sm">Cash</div>
-            </button>
-            <button
-              onClick={() => askBill("card")}
-              className="border-2 border-ink bg-white py-6 active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
-            >
-              <div className="text-2xl">💳</div>
-              <div className="mt-1.5 font-black uppercase tracking-wide text-sm">Card</div>
-            </button>
-          </div>
+          {TERMINAL_ENABLED ? (
+            <div className="space-y-3">
+              <button
+                onClick={payByCard}
+                disabled={busy || !order}
+                className="w-full bg-brass text-ink py-4 font-black uppercase tracking-wide text-sm active:scale-[0.99] disabled:opacity-50 transition"
+              >
+                {busy ? "Opening payment…" : "💳 Pay by card now"}
+              </button>
+              <button
+                onClick={() => askBill("cash")}
+                className="w-full border-2 border-ink bg-white py-4 font-black uppercase tracking-wide text-sm active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
+              >
+                💵 Pay with cash (call staff)
+              </button>
+              <p className="text-[11px] text-mocha/70 text-center pt-1">
+                Card payments are processed securely by Maya.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-mocha mb-3">How will you pay? Staff will bring your bill.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => askBill("cash")}
+                  className="border-2 border-ink bg-white py-6 active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
+                >
+                  <div className="text-2xl">💵</div>
+                  <div className="mt-1.5 font-black uppercase tracking-wide text-sm">Cash</div>
+                </button>
+                <button
+                  onClick={() => askBill("card")}
+                  className="border-2 border-ink bg-white py-6 active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
+                >
+                  <div className="text-2xl">💳</div>
+                  <div className="mt-1.5 font-black uppercase tracking-wide text-sm">Card</div>
+                </button>
+              </div>
+            </>
+          )}
         </Sheet>
       )}
 
