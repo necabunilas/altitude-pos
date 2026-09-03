@@ -62,7 +62,7 @@ export default function CounterOrder({ menu }) {
         body: JSON.stringify({
           label: name,
           note,
-          paymentMethod: payMethod === "later" ? null : payMethod,
+          paymentMethod: payMethod,
           cart: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),
         }),
       });
@@ -213,7 +213,6 @@ export default function CounterOrder({ menu }) {
             {[
               ["cash", "💵 Cash"],
               ["card", "💳 Card"],
-              ["later", "Pay later"],
             ].map(([v, l]) => (
               <button
                 key={v}
@@ -245,8 +244,6 @@ export default function CounterOrder({ menu }) {
                 ? "Placing…"
                 : !count
                 ? "Add items to start"
-                : payMethod === "later"
-                ? `Place order · ${formatPeso(total)}`
                 : `Place & pay ${payMethod} · ${formatPeso(total)}`}
             </button>
           </div>
