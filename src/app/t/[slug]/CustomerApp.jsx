@@ -447,15 +447,23 @@ export default function CustomerApp({ slug, table, menu }) {
               >
                 {busy ? "Opening payment…" : "💳 Pay by card now"}
               </button>
-              <button
-                onClick={() => askBill("cash")}
-                className="w-full border-2 border-ink bg-white py-4 font-black uppercase tracking-wide text-sm active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
-              >
-                💵 Pay with Cash / QR (Call staff)
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => askBill("cash")}
+                  className="border-2 border-ink bg-white py-4 font-black uppercase tracking-wide text-sm active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
+                >
+                  💵 Cash
+                </button>
+                <button
+                  onClick={() => askBill("qr")}
+                  className="border-2 border-ink bg-white py-4 font-black uppercase tracking-wide text-sm active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
+                >
+                  📱 QR
+                </button>
+              </div>
               <p className="text-[11px] text-mocha/70 text-center pt-1">
-                Card payments are processed securely by Maya. For cash or
-                GCash / Maya QR, staff will assist you at your table.
+                Card is paid here in the app. For cash or GCash / Maya QR, staff
+                will assist you at your table.
               </p>
             </div>
           ) : (

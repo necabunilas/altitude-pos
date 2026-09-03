@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatPeso } from "@/lib/money";
+import { formatPeso, methodLabel } from "@/lib/money";
 import BillModal from "./BillModal";
 import { ReceiptModal } from "./Receipt";
 
@@ -157,7 +157,7 @@ export default function OrderBoard() {
             >
               <div className="font-medium">
                 {c.type === "bill"
-                  ? `🧾 Bill requested${c.paymentMethod ? ` (${c.paymentMethod})` : ""}`
+                  ? `🧾 Bill requested${c.paymentMethod ? ` (${methodLabel(c.paymentMethod)})` : ""}`
                   : "🙋 Waiter called"}{" "}
                 · {c.table?.label || "Unknown"}
                 <span className="opacity-70 text-sm ml-2">{since(c.createdAt)}</span>

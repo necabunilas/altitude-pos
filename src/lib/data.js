@@ -200,7 +200,11 @@ export async function markTablePaid(tableId, opts = {}) {
       .from(calls)
       .where(and(eq(calls.tableId, tableId), eq(calls.type, "bill"), eq(calls.status, "open")))
       .get();
-    method = billCall?.paymentMethod || null;
+    // Only carry a concrete tender; the "cash_qr" request hint isn't a real
+    // method, so leave it unset for staff to choose at settle time.
+    method = ["cash", "card", "qr"].includes(billCall?.paymentMethod)
+      ? billCall.paymentMethod
+      : null;
   }
   const provider = opts.provider || null;
   const ref = opts.ref || null;
@@ -358,7 +362,7 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
 export async function createCall({ tableId, type, paymentMethod = null }) {
   if (!["waiter", "bill"].includes(type)) throw new Error("Bad call type");
   const method =
-    type === "bill" && ["cash", "card"].includes(paymentMethod) ? paymentMethod : null;
+    type === "bill" && ["cash", "card", "qr"].includes(paymentMethod) ? paymentMethod : null;
   // Collapse duplicate open calls of the same type for a table (refresh the
   // chosen payment method if a bill is re-requested).
   const existing = await db

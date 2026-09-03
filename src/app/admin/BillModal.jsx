@@ -87,7 +87,11 @@ export default function BillModal({
                     : "bg-emerald-100 text-emerald-800"
                 }`}
               >
-                {requestedMethod === "card" ? "💳 Card" : "💵 Cash"}
+                {requestedMethod === "card"
+                  ? "💳 Card"
+                  : requestedMethod === "qr"
+                  ? "📱 QR"
+                  : "💵 Cash"}
               </span>
             )}
           </h3>
