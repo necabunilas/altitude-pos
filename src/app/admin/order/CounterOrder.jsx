@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatPeso } from "@/lib/money";
 
+// Display names for the tender chosen at the counter.
+const METHOD_LABEL = { cash: "Cash", card: "Card", qr: "QR" };
+
 // Staff-facing counter / bar order entry. Builds a cart from the menu and rings
 // it up as a standalone order (its own hidden table) that appears on the board.
 export default function CounterOrder({ menu }) {
@@ -213,6 +216,7 @@ export default function CounterOrder({ menu }) {
             {[
               ["cash", "💵 Cash"],
               ["card", "💳 Card"],
+              ["qr", "📱 QR"],
             ].map(([v, l]) => (
               <button
                 key={v}
@@ -244,7 +248,7 @@ export default function CounterOrder({ menu }) {
                 ? "Placing…"
                 : !count
                 ? "Add items to start"
-                : `Place & pay ${payMethod} · ${formatPeso(total)}`}
+                : `Place & pay ${METHOD_LABEL[payMethod] || payMethod} · ${formatPeso(total)}`}
             </button>
           </div>
         </div>
@@ -274,7 +278,7 @@ export default function CounterOrder({ menu }) {
               }`}
             >
               {placed.method
-                ? `✓ Paid · ${placed.method === "card" ? "Card" : "Cash"}`
+                ? `✓ Paid · ${METHOD_LABEL[placed.method] || "Cash"}`
                 : "Unpaid · bill on the board"}
             </div>
             <div className="flex gap-2 mt-5">

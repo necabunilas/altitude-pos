@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { formatPeso } from "@/lib/money";
 import Receipt from "./Receipt";
-import { TERMINAL_ENABLED } from "@/lib/flags";
 
 // Shows every open order for a table as its own receipt, lets staff print each,
 // and settles the whole table (paid + closed) resolving any bill call.
@@ -27,11 +26,16 @@ export default function BillModal({
     (o) => !o.paidAt && o.paymentProvider === "maya" && o.paymentRef
   );
 
-  async function post(path, { keepOpen = false } = {}) {
+  async function post(path, { keepOpen = false, body = null } = {}) {
     if (busy) return;
     setBusy(true);
     try {
-      const res = await fetch(path, { method: "POST" });
+      const res = await fetch(path, {
+        method: "POST",
+        ...(body
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+          : {}),
+      });
       if (res.ok) {
         (keepOpen ? onPaid || onSettled : onSettled)();
         return true;
@@ -43,51 +47,15 @@ export default function BillModal({
       setBusy(false);
     }
   }
-  // Pop a confirmation modal, and keep the bill open behind it, on Mark paid.
-  const markPaid = async () => {
-    if (await post(`/api/tables/${table.id}/pay`, { keepOpen: true })) setPaidFlash(true);
+  // Record payment with the chosen tender (cash / qr), keeping the bill open
+  // behind a confirmation. Card is recorded automatically when the customer
+  // pays in the app, so it isn't offered here.
+  const markPaid = async (method) => {
+    if (await post(`/api/tables/${table.id}/pay`, { keepOpen: true, body: { method } }))
+      setPaidFlash(true);
   };
   const closeOrder = () => post(`/api/tables/${table.id}/close`);
   const resolveOnly = () => post(`/api/calls/resolve-bill?tableId=${table.id}`);
-
-  // Verify a pending card payment directly with Maya, in case the customer's
-  // browser never redirected back to settle it.
-  async function checkCardStatus() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/tables/${table.id}/maya-status`, { method: "POST" });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok && d.paid) {
-        onPaid?.() || onSettled();
-        setPaidFlash(true);
-      } else if (res.ok) {
-        alert("Payment not completed yet. Ask the customer to finish, then check again.");
-      } else {
-        alert(d.error || "Could not check the payment.");
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Terminal upgrade: open a Maya (sandbox) checkout; the callback verifies and
-  // marks the order paid, which the board picks up on its next poll.
-  async function payViaTerminal() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/tables/${table.id}/maya-checkout`, { method: "POST" });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok && d.redirectUrl) {
-        window.open(d.redirectUrl, "_blank", "noopener");
-      } else {
-        alert(d.error || "Could not start the payment.");
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
 
   // Reset the printable flag after the print dialog closes.
   useEffect(() => {
@@ -157,44 +125,31 @@ export default function BillModal({
             </div>
             {!paid ? (
               <>
-                {TERMINAL_ENABLED && requestedMethod !== "cash" && (
-                  <>
-                    <button
-                      onClick={payViaTerminal}
-                      disabled={busy}
-                      className="w-full py-3 bg-ink text-white font-black uppercase tracking-wide text-sm hover:bg-espresso-light transition-colors disabled:opacity-50"
-                    >
-                      {busy ? "Opening payment…" : "💳 Pay via terminal"}
-                    </button>
-                    <p className="text-[11px] text-neutral-400 text-center">
-                      Opens a card / QR Ph payment; marks paid automatically on success.
-                    </p>
-                  </>
+                {pendingCard && (
+                  <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1.5 text-center">
+                    💳 A card payment is in progress — it marks paid automatically
+                    when the customer finishes in the app.
+                  </p>
                 )}
-                {TERMINAL_ENABLED && pendingCard && (
-                  <>
-                    <button
-                      onClick={checkCardStatus}
-                      disabled={busy}
-                      className="w-full py-3 border border-ink text-ink font-black uppercase tracking-wide text-sm hover:bg-ink hover:text-white transition-colors disabled:opacity-50"
-                    >
-                      {busy ? "Checking…" : "🔄 Check payment status"}
-                    </button>
-                    <p className="text-[11px] text-neutral-400 text-center">
-                      Confirms a card payment with Maya if the customer already paid.
-                    </p>
-                  </>
-                )}
-                <button
-                  onClick={markPaid}
-                  disabled={busy}
-                  className="w-full py-3 bg-emerald-600 text-white font-black uppercase tracking-wide text-sm disabled:opacity-50"
-                >
-                  {busy ? "Saving…" : "Mark paid"}
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => markPaid("cash")}
+                    disabled={busy}
+                    className="py-3 bg-emerald-600 text-white font-black uppercase tracking-wide text-sm disabled:opacity-50"
+                  >
+                    {busy ? "Saving…" : "💵 Paid · Cash"}
+                  </button>
+                  <button
+                    onClick={() => markPaid("qr")}
+                    disabled={busy}
+                    className="py-3 bg-mocha text-white font-black uppercase tracking-wide text-sm disabled:opacity-50"
+                  >
+                    {busy ? "Saving…" : "📱 Paid · QR"}
+                  </button>
+                </div>
                 <p className="text-[11px] text-neutral-400 text-center">
-                  Records payment and clears the bill request. The order stays open
-                  until you close it.
+                  Card is recorded automatically when the customer pays in the app.
+                  The order stays open until you close it.
                 </p>
                 <button
                   onClick={resolveOnly}

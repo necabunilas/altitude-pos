@@ -8,6 +8,10 @@ export async function POST(request, { params }) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
-  const orders = await markTablePaid(Number(id));
+  const body = await request.json().catch(() => ({}));
+  // Staff-chosen tender (cash / qr / card). Falls back to the guest's bill
+  // request method when not provided.
+  const method = ["cash", "card", "qr"].includes(body.method) ? body.method : undefined;
+  const orders = await markTablePaid(Number(id), method ? { method } : {});
   return Response.json({ ok: true, count: orders.length });
 }

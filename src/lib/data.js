@@ -305,10 +305,11 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
     };
   });
   const count = countRow?.n || 0;
-  let cashCents = 0, cardCents = 0, otherCents = 0;
+  let cashCents = 0, cardCents = 0, qrCents = 0, otherCents = 0;
   for (const m of methodRows) {
     if (m.method === "cash") cashCents += m.r;
     else if (m.method === "card") cardCents += m.r;
+    else if (m.method === "qr") qrCents += m.r;
     else otherCents += m.r;
   }
   // Per-category revenue + units, tagged food vs drink, highest revenue first.
@@ -333,6 +334,7 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
       revenueCents: revRow?.r || 0,
       cashCents,
       cardCents,
+      qrCents,
       otherCents,
       categoryBreakdown,
       foodCents,
@@ -433,7 +435,7 @@ export async function placeCounterOrder({ label, cart, note = "", paymentMethod 
   const order = await placeOrder({ tableId: table.id, cart, note });
   // Counter/bar is pay-first: if a method is chosen, mark it paid right away.
   // The order still stays open on the board until it is served and closed.
-  const method = ["cash", "card"].includes(paymentMethod) ? paymentMethod : null;
+  const method = ["cash", "card", "qr"].includes(paymentMethod) ? paymentMethod : null;
   if (method) await markTablePaid(table.id, { method });
   return { orderId: order.id, tableId: table.id, label: clean, method };
 }

@@ -174,7 +174,8 @@ export default function SalesView() {
           </div>
           <div className="text-xs text-mocha mt-1.5">
             💵 Cash {formatPeso(summary.cashCents || 0)} · 💳 Card{" "}
-            {formatPeso(summary.cardCents || 0)}
+            {formatPeso(summary.cardCents || 0)} · 📱 QR{" "}
+            {formatPeso(summary.qrCents || 0)}
             {summary.otherCents ? ` · Other ${formatPeso(summary.otherCents)}` : ""}
           </div>
         </div>
@@ -235,10 +236,16 @@ export default function SalesView() {
                 className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
                   order.paymentMethod === "card"
                     ? "bg-brass/15 text-brass-dark"
+                    : order.paymentMethod === "qr"
+                    ? "bg-mocha/15 text-mocha"
                     : "bg-sage/15 text-sage"
                 }`}
               >
-                {order.paymentMethod === "card" ? "Card" : "Cash"}
+                {order.paymentMethod === "card"
+                  ? "Card"
+                  : order.paymentMethod === "qr"
+                  ? "QR"
+                  : "Cash"}
               </span>
             )}
             <span className="font-semibold">{formatPeso(order.totalCents)}</span>

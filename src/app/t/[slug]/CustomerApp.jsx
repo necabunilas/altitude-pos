@@ -451,10 +451,11 @@ export default function CustomerApp({ slug, table, menu }) {
                 onClick={() => askBill("cash")}
                 className="w-full border-2 border-ink bg-white py-4 font-black uppercase tracking-wide text-sm active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
               >
-                💵 Pay with cash (call staff)
+                💵 Pay with Cash / QR (Call staff)
               </button>
               <p className="text-[11px] text-mocha/70 text-center pt-1">
-                Card payments are processed securely by Maya.
+                Card payments are processed securely by Maya. For cash or
+                GCash / Maya QR, staff will assist you at your table.
               </p>
             </div>
           ) : (
