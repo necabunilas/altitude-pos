@@ -121,9 +121,11 @@ export function ReceiptModal({ order, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 no-print" onClick={onClose} />
-      <div className="relative bg-white border border-ink shadow-xl w-full max-w-xs">
-        <Receipt order={order} />
-        <div className="no-print flex gap-2 p-3 border-t border-sand">
+      <div className="relative bg-white border border-ink shadow-xl w-full max-w-xs max-h-[90vh] flex flex-col">
+        <div className="overflow-y-auto">
+          <Receipt order={order} />
+        </div>
+        <div className="no-print flex gap-2 p-3 border-t border-sand shrink-0">
           <button
             onClick={onClose}
             className="flex-1 py-2.5 border border-ink text-sm font-black uppercase tracking-wide hover:bg-ink hover:text-white transition-colors"
