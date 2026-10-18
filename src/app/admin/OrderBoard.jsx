@@ -85,9 +85,9 @@ export default function OrderBoard() {
   // How the guest said they'd pay (from their bill request), if any.
   const billCall = calls.find((c) => c.type === "bill" && c.table?.id === billTableId);
   const requestedMethod = billCall?.paymentMethod || null;
-  // Show the longest-waiting orders first (kitchen FIFO).
+  // Show the newest orders first (leftmost).
   const activeOrders = [...orders].sort(
-    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   );
 
   // Optimistically patch an order's items in local state so the buttons react
