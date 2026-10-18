@@ -2,7 +2,7 @@ import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { RESTAURANT_NAME } from "@/lib/brand";
 
-// Altitude PH uses Montserrat across the board; a single family covers body,
+// altitude.cc uses Montserrat across the board; a single family covers body,
 // section headings (font-display), and the logotype (font-script).
 const montserrat = Montserrat({
   variable: "--font-montserrat",

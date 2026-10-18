@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  /* Altitude PH brand theme; stark white base with near-black ink text. */
+  /* altitude.cc brand theme; stark white base with near-black ink text. */
   --background: #ffffff;
   --foreground: #0a0a0a;
 }
@@ -14,7 +14,7 @@
   --font-display: var(--font-montserrat), -apple-system, BlinkMacSystemFont, sans-serif;
   --font-script: var(--font-montserrat), -apple-system, BlinkMacSystemFont, sans-serif;
 
-  /* Altitude PH brand palette (gold / wine / teal on off-white & charcoal),
+  /* altitude.cc brand palette (gold / wine / teal on off-white & charcoal),
      mapped onto the original semantic token names so every component keeps
      working: neutrals -> off-white/white/gray, darks -> charcoal/black,
      accents -> gold, secondary -> teal, deep accent -> wine. */
