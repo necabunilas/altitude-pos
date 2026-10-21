@@ -75,9 +75,13 @@ export default function AdminNav() {
           </svg>
         </button>
 
-        <span className="font-black uppercase tracking-tight text-2xl text-espresso leading-none">
+        {/* Name goes back to the home banner (counter's idle screen). */}
+        <Link
+          href="/"
+          className="font-black uppercase tracking-tight text-2xl text-espresso leading-none hover:text-brass-dark transition-colors"
+        >
           {RESTAURANT_NAME}
-        </span>
+        </Link>
 
         {/* Inline links (desktop only) */}
         <div className="hidden sm:flex items-center gap-1 ml-2">
