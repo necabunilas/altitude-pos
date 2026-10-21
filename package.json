@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:seed": "node src/db/seed.js"
+    "db:seed": "node src/db/seed.js",
+    "db:menu": "node src/db/import-menu.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
