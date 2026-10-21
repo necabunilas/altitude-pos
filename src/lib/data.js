@@ -29,10 +29,13 @@ export async function getMenu({ onlyAvailable = false } = {}) {
     db.select().from(menuItems).orderBy(asc(menuItems.sortOrder)).all(),
   ]);
   const items = allItems.filter((i) => (onlyAvailable ? i.available : true));
-  return cats.map((c) => ({
+  const menu = cats.map((c) => ({
     ...c,
     items: items.filter((i) => i.categoryId === c.id),
   }));
+  // Customers shouldn't see a category header with nothing under it; staff
+  // still need empty categories in the menu editor to add items to them.
+  return onlyAvailable ? menu.filter((c) => c.items.length) : menu;
 }
 
 // Create an order from a cart of { menuItemId, qty, note }.
