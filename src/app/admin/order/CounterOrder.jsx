@@ -20,6 +20,7 @@ export default function CounterOrder({ menu }) {
   const [query, setQuery] = useState("");
   const [showCart, setShowCart] = useState(true);
   const [payMethod, setPayMethod] = useState("cash"); // "cash" | "card" | "later"
+  const [received, setReceived] = useState(""); // cash handed over, in pesos
 
   const itemsById = useMemo(() => {
     const m = {};
@@ -33,6 +34,15 @@ export default function CounterOrder({ menu }) {
     .filter((l) => l.item);
   const total = lines.reduce((s, l) => s + l.item.priceCents * l.qty, 0);
   const count = lines.reduce((s, l) => s + l.qty, 0);
+
+  // Cash tendered + change. Blank means exact amount.
+  const isCash = payMethod === "cash";
+  const receivedNum = received === "" ? NaN : Number(received);
+  const receivedCents = Number.isFinite(receivedNum) ? Math.round(receivedNum * 100) : null;
+  const changeCents = receivedCents === null ? null : receivedCents - total;
+  const short = isCash && changeCents !== null && changeCents < 0;
+  // Quick-tap bills: the common notes that cover the total.
+  const quickBills = [100, 200, 500, 1000].filter((b) => b * 100 >= total).slice(0, 3);
 
   const setQty = (id, qty) => setCart((c) => ({ ...c, [id]: Math.max(0, Math.min(50, qty)) }));
   const clearCart = () => {
@@ -56,7 +66,7 @@ export default function CounterOrder({ menu }) {
   }
 
   async function placeOrder() {
-    if (!count || busy) return;
+    if (!count || busy || short) return;
     setBusy(true);
     try {
       const res = await fetch("/api/staff-order", {
@@ -71,7 +81,16 @@ export default function CounterOrder({ menu }) {
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        setPlaced({ orderId: d.orderId, label: d.label, total, count, method: d.method });
+        setPlaced({
+          orderId: d.orderId,
+          label: d.label,
+          total,
+          count,
+          method: d.method,
+          receivedCents: isCash ? receivedCents : null,
+          changeCents: isCash ? changeCents : null,
+        });
+        setReceived("");
         setCart({});
         setName("");
         setNote("");
@@ -231,6 +250,45 @@ export default function CounterOrder({ menu }) {
               </button>
             ))}
           </div>
+          {/* Cash received -> change to give back */}
+          {isCash && count > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center border border-ink bg-white focus-within:border-brass">
+                <span className="pl-3 text-sm text-mocha">Received ₱</span>
+                <input
+                  value={received}
+                  onChange={(e) => setReceived(e.target.value.replace(/[^\d.]/g, ""))}
+                  inputMode="decimal"
+                  placeholder={(total / 100).toFixed(0)}
+                  className="w-24 px-2 py-2 text-sm tabular-nums focus:outline-none"
+                />
+              </label>
+              <button
+                onClick={() => setReceived(String(total / 100))}
+                className="px-3 py-2 border border-ink text-xs font-black uppercase tracking-wide hover:bg-ink hover:text-white transition-colors"
+              >
+                Exact
+              </button>
+              {quickBills.map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setReceived(String(b))}
+                  className="px-3 py-2 border border-ink text-xs font-black tabular-nums hover:bg-ink hover:text-white transition-colors"
+                >
+                  ₱{b}
+                </button>
+              ))}
+              {changeCents !== null && (
+                <span
+                  className={`ml-auto text-sm font-black tabular-nums ${
+                    short ? "text-red-600" : "text-emerald-700"
+                  }`}
+                >
+                  {short ? `Short ${formatPeso(-changeCents)}` : `Change ${formatPeso(changeCents)}`}
+                </span>
+              )}
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => setShowCart((v) => !v)}
@@ -241,7 +299,7 @@ export default function CounterOrder({ menu }) {
             </button>
             <button
               onClick={placeOrder}
-              disabled={!count || busy}
+              disabled={!count || busy || short}
               className="flex-1 py-3 bg-emerald-600 text-white font-black uppercase tracking-wide disabled:opacity-40"
             >
               {busy
@@ -281,6 +339,17 @@ export default function CounterOrder({ menu }) {
                 ? `✓ Paid · ${METHOD_LABEL[placed.method] || "Cash"}`
                 : "Unpaid · bill on the board"}
             </div>
+            {placed.changeCents !== null && (
+              <div className="mt-4 border-t border-sand pt-4">
+                <div className="text-xs text-mocha/70 tabular-nums">
+                  Received {formatPeso(placed.receivedCents)}
+                </div>
+                <div className="text-xs uppercase tracking-[0.15em] text-brass-dark mt-2">Change</div>
+                <div className="font-black text-4xl text-emerald-700 tabular-nums">
+                  {formatPeso(placed.changeCents)}
+                </div>
+              </div>
+            )}
             <div className="flex gap-2 mt-5">
               <Link
                 href="/admin"
