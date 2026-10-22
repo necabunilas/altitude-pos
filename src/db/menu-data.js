@@ -16,6 +16,7 @@ export const MENU = [
       { name: "Espresso", price: 120, description: "Double shot espresso. Just espresso. For the cold-hearted." },
       { name: "Hot Chocolate", price: 140, description: "Chocolate + steamed milk. For the kids. But if you're a kid at heart, you can get this too." },
       { name: "Matcha Latte", price: 140, description: "Matcha + steamed milk. For the matcha lovers out there. We see you." },
+      { name: "Piccolo", price: 120, description: "Single shot espresso + steamed milk. Small, strong and smooth." },
     ],
   },
   {
@@ -28,6 +29,7 @@ export const MENU = [
       { name: "Iced Matcha Latte", price: 170, description: "Matcha + milk + condensed milk. For our matcha lovers out there. We see you." },
       { name: "Mocha Brew", price: 180, description: "Espresso + chocolate + milk + condensed milk. Coffee and chocolate together, what's not to love?" },
       { name: "White Brew", price: 170, description: "Espresso + milk + condensed milk. This is basically a spanish latte, but cold. Everyone's favorite!" },
+      { name: "Iced Americano", price: 120, description: "Double shot espresso + water, over ice. Clean, bold and refreshing." },
     ],
   },
   {
@@ -35,6 +37,9 @@ export const MENU = [
     items: [
       { name: "Dark Rye Cookies", price: 50, description: "" },
       { name: "Ssamjang Biscuit", price: 130, description: "With hot honey." },
+      { name: "Butter Croissant", price: 120, description: "Flaky, golden and all butter. The classic." },
+      { name: "Pain au Chocolat", price: 140, description: "Buttery croissant dough wrapped around dark chocolate." },
+      { name: "Almond Croissant", price: 120, description: "Filled with almond cream and topped with toasted almonds." },
     ],
   },
   {
