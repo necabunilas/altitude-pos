@@ -1,4 +1,4 @@
-import { cancelOrder } from "@/lib/data";
+import { cancelOrder, deleteOrder } from "@/lib/data";
 import { isStaffAuthed } from "@/lib/auth";
 
 // Order-level actions: cancel the whole order.
@@ -18,4 +18,14 @@ export async function PATCH(request, { params }) {
   } catch (e) {
     return Response.json({ error: e.message }, { status: 400 });
   }
+}
+// Staff: permanently delete an order (fixes mistaken orders, even paid/closed).
+export async function DELETE(request, { params }) {
+  if (!(await isStaffAuthed())) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { id } = await params;
+  const order = await deleteOrder(Number(id));
+  if (!order) return Response.json({ error: "Not found" }, { status: 404 });
+  return Response.json({ ok: true });
 }

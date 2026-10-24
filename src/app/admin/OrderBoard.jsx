@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatPeso, methodLabel } from "@/lib/money";
+import DeleteOrderModal from "./DeleteOrderModal";
+import ConfirmModal from "./ConfirmModal";
 import BillModal from "./BillModal";
 import { ReceiptModal } from "./Receipt";
 
@@ -45,6 +47,8 @@ export default function OrderBoard() {
   const [viewOrder, setViewOrder] = useState(null);
   const [closedSummary, setClosedSummary] = useState({ count: 0, revenueCents: 0 });
   const [showClosed, setShowClosed] = useState(false);
+  const [deleting, setDeleting] = useState(null); // order awaiting delete confirmation
+  const [voiding, setVoiding] = useState(null); // { item, order } awaiting void confirmation
   // Count of in-flight mutations. The background poll stands down while > 0 so
   // it can't revert an optimistic update with stale data mid-request.
   const mutating = useRef(0);
@@ -118,7 +122,6 @@ export default function OrderBoard() {
   }
 
   function voidItem(itemId) {
-    if (!confirm("Void this item?")) return;
     return mutate(
       (o) => {
         const next = o.items.filter((it) => it.id !== itemId);
@@ -128,15 +131,15 @@ export default function OrderBoard() {
     );
   }
 
-  function cancel(order) {
-    if (!confirm("Cancel the whole order?")) return;
-    return mutate(null, () =>
-      fetch(`/api/orders/${order.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "cancel" }),
-      })
-    );
+  function remove(order) {
+    setDeleting(order);
+  }
+
+  async function deleteOrder(order) {
+    const res = await fetch(`/api/orders/${order.id}`, { method: "DELETE" });
+    const d = await res.json().catch(() => ({}));
+    if (res.ok) refresh(true);
+    return { ok: res.ok, error: d.error };
   }
 
   function resolveCall(id) {
@@ -245,7 +248,7 @@ export default function OrderBoard() {
                     )}
                     {!paid && (
                       <button
-                        onClick={() => voidItem(it.id)}
+                        onClick={() => setVoiding({ item: it, order })}
                         title="Void item"
                         className="text-mocha/40 hover:text-red-600 leading-none text-lg"
                       >
@@ -264,14 +267,12 @@ export default function OrderBoard() {
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-sand/60">
                 <span className="font-semibold">{formatPeso(order.totalCents)}</span>
                 <div className="flex gap-2 items-center">
-                  {!paid && (
-                    <button
-                      onClick={() => cancel(order)}
-                      className="text-sm text-mocha/70 hover:text-red-600"
-                    >
-                      Cancel
-                    </button>
-                  )}
+                  <button
+                    onClick={() => remove(order)}
+                    className="text-sm text-mocha/70 hover:text-red-600"
+                  >
+                    Delete
+                  </button>
                   <button
                     onClick={() => setBillTableId(order.tableId)}
                     className={`text-xs px-3 py-1.5 text-white font-black uppercase tracking-wide ${
@@ -304,10 +305,9 @@ export default function OrderBoard() {
           {showClosed && (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {closed.map((order) => (
-              <button
+              <div
                 key={order.id}
-                onClick={() => setViewOrder(order)}
-                className="text-left bg-white border border-ink p-3 hover:border-brass transition"
+                className="text-left bg-white border border-ink p-3"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-ink">
@@ -323,12 +323,52 @@ export default function OrderBoard() {
                   </span>
                   <span className="font-semibold">{formatPeso(order.totalCents)}</span>
                 </div>
-                <span className="text-xs text-mocha/70 underline">View receipt</span>
-              </button>
+                <div className="flex items-center justify-between mt-1">
+                  <button
+                    onClick={() => setViewOrder(order)}
+                    className="text-xs text-mocha/70 underline hover:text-ink"
+                  >
+                    View receipt
+                  </button>
+                  <button
+                    onClick={() => remove(order)}
+                    className="text-xs text-mocha/70 hover:text-red-600"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
           )}
         </div>
+      )}
+
+      {voiding && (
+        <ConfirmModal
+          title="Void item?"
+          confirmLabel="Void"
+          busyLabel="Voiding…"
+          onConfirm={() => voidItem(voiding.item.id)}
+          onClose={() => setVoiding(null)}
+        >
+          <div className="mt-1 text-mocha">
+            {voiding.item.qty}× {voiding.item.name}
+          </div>
+          <p className="text-xs text-mocha/70 mt-1">
+            Order #{voiding.order.id}
+            {voiding.order.table?.label ? ` · ${voiding.order.table.label}` : ""}
+          </p>
+          <p className="text-sm text-mocha mt-4">It will be removed from this order.</p>
+        </ConfirmModal>
+      )}
+
+      {deleting && (
+        <DeleteOrderModal
+          order={deleting}
+          onConfirm={() => deleteOrder(deleting)}
+          onClose={() => setDeleting(null)}
+        />
       )}
 
       {viewOrder && (

@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { formatPeso } from "@/lib/money";
+import ConfirmModal from "../ConfirmModal";
 
 export default function MenuManager({ initialMenu }) {
   const [menu, setMenu] = useState(initialMenu);
+  // Pending delete awaiting confirmation: { item } or { cat }.
+  const [confirming, setConfirming] = useState(null);
   const categories = menu.map((c) => ({ id: c.id, name: c.name }));
 
   async function reload() {
@@ -22,20 +25,17 @@ export default function MenuManager({ initialMenu }) {
   }
 
   async function remove(item) {
-    if (!confirm(`Delete "${item.name}"?`)) return;
-    await fetch(`/api/menu/items/${item.id}`, { method: "DELETE" });
-    reload();
+    const res = await fetch(`/api/menu/items/${item.id}`, { method: "DELETE" });
+    const d = await res.json().catch(() => ({}));
+    if (res.ok) reload();
+    return { ok: res.ok, error: d.error || "Could not delete the item." };
   }
 
   async function removeCategory(cat) {
-    if (!confirm(`Delete the "${cat.name}" category?`)) return;
     const res = await fetch(`/api/menu/categories/${cat.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      alert(d.error || "Could not delete category.");
-      return;
-    }
-    reload();
+    const d = await res.json().catch(() => ({}));
+    if (res.ok) reload();
+    return { ok: res.ok, error: d.error || "Could not delete category." };
   }
 
   return (
@@ -56,7 +56,7 @@ export default function MenuManager({ initialMenu }) {
             </div>
             {cat.items.length === 0 && (
               <button
-                onClick={() => removeCategory(cat)}
+                onClick={() => setConfirming({ cat })}
                 className="text-xs text-mocha/70 hover:text-red-600"
               >
                 Delete category
@@ -96,7 +96,7 @@ export default function MenuManager({ initialMenu }) {
                   {item.available ? "Available" : "Hidden"}
                 </button>
                 <button
-                  onClick={() => remove(item)}
+                  onClick={() => setConfirming({ item })}
                   title="Delete item"
                   className="w-7 h-7 grid place-items-center border border-transparent text-neutral-300 hover:text-red-600 hover:border-red-200 text-lg leading-none transition-colors"
                 >
@@ -113,6 +113,34 @@ export default function MenuManager({ initialMenu }) {
 
       {categories.length === 0 && (
         <p className="text-mocha/70">Add a category to get started.</p>
+      )}
+
+      {confirming?.item && (
+        <ConfirmModal
+          title="Delete item?"
+          onConfirm={() => remove(confirming.item)}
+          onClose={() => setConfirming(null)}
+        >
+          <div className="mt-1 text-mocha">{confirming.item.name}</div>
+          <div className="mt-3 font-semibold text-3xl text-espresso">
+            {formatPeso(confirming.item.priceCents)}
+          </div>
+          <p className="text-sm text-mocha mt-4">
+            It will be removed from the menu. Past orders and sales keep it. To take it off
+            the menu for now, set it to Hidden instead.
+          </p>
+        </ConfirmModal>
+      )}
+
+      {confirming?.cat && (
+        <ConfirmModal
+          title="Delete category?"
+          onConfirm={() => removeCategory(confirming.cat)}
+          onClose={() => setConfirming(null)}
+        >
+          <div className="mt-1 text-mocha">{confirming.cat.name}</div>
+          <p className="text-sm text-mocha mt-4">It has no items and will be removed from the menu.</p>
+        </ConfirmModal>
       )}
     </div>
   );

@@ -162,6 +162,28 @@ export async function cancelOrder(id) {
   return db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, id)).returning().get();
 }
 
+// Permanently delete an order (active, paid or closed), e.g. one rung up by
+// mistake. Removes its items so it drops out of sales totals; feedback that
+// pointed at it is kept but unlinked. If it was the table's open order, any
+// open waiter/bill calls for that table are cleared too.
+export async function deleteOrder(id) {
+  const order = await db.select().from(orders).where(eq(orders.id, id)).get();
+  if (!order) return null;
+  await db.batch([
+    db.update(feedback).set({ orderId: null }).where(eq(feedback.orderId, id)),
+    db.delete(orderItems).where(eq(orderItems.orderId, id)),
+    db.delete(orders).where(eq(orders.id, id)),
+  ]);
+  if (!order.closedAt) {
+    await db
+      .update(calls)
+      .set({ status: "resolved" })
+      .where(and(eq(calls.tableId, order.tableId), eq(calls.status, "open")))
+      .run();
+  }
+  return order;
+}
+
 // Advance a single item's status ("preparing" or "served").
 export async function setItemStatus(itemId, status) {
   if (!["placed", "preparing", "served"].includes(status)) throw new Error("Bad item status");
@@ -487,6 +509,9 @@ export async function updateMenuItem(id, patch) {
 }
 
 export async function deleteMenuItem(id) {
+  // Past order lines keep their own name + price; unlink them so the delete
+  // isn't blocked by the foreign key (Sales lists them as "Uncategorized").
+  await db.update(orderItems).set({ menuItemId: null }).where(eq(orderItems.menuItemId, id)).run();
   return db.delete(menuItems).where(eq(menuItems.id, id)).returning().get();
 }
 

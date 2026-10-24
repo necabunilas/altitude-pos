@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatPeso } from "@/lib/money";
+import DeleteOrderModal from "../DeleteOrderModal";
 import { ReceiptModal } from "../Receipt";
 
 function fmt(d) {
@@ -45,6 +46,7 @@ export default function SalesView() {
   const [loading, setLoading] = useState(false);
   const [viewOrder, setViewOrder] = useState(null);
   const [preset, setPreset] = useState("today");
+  const [deleting, setDeleting] = useState(null); // order awaiting delete confirmation
 
   function applyPreset(kind) {
     const r = presetRange(kind);
@@ -71,6 +73,14 @@ export default function SalesView() {
     },
     [from, to]
   );
+
+  async function deleteOrder(order) {
+    const res = await fetch(`/api/orders/${order.id}`, { method: "DELETE" });
+    const d = await res.json().catch(() => ({}));
+    // Reload so the totals and breakdowns drop the deleted order.
+    if (res.ok) fetchPage(0);
+    return { ok: res.ok, error: d.error };
+  }
 
   // Reload from the start whenever the range changes.
   useEffect(() => {
@@ -255,6 +265,12 @@ export default function SalesView() {
             >
               Receipt
             </button>
+            <button
+              onClick={() => setDeleting(order)}
+              className="text-xs text-mocha/70 hover:text-red-600"
+            >
+              Delete
+            </button>
           </div>
         ))}
       </div>
@@ -271,6 +287,14 @@ export default function SalesView() {
 
       {viewOrder && (
         <ReceiptModal order={viewOrder} onClose={() => setViewOrder(null)} />
+      )}
+
+      {deleting && (
+        <DeleteOrderModal
+          order={deleting}
+          onConfirm={() => deleteOrder(deleting)}
+          onClose={() => setDeleting(null)}
+        />
       )}
     </div>
   );
