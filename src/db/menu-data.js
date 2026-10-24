@@ -16,6 +16,7 @@ export const MENU = [
       { name: "Espresso", price: 120, description: "Double shot espresso. Just espresso. For the cold-hearted." },
       { name: "Hot Chocolate", price: 140, description: "Chocolate + steamed milk. For the kids. But if you're a kid at heart, you can get this too." },
       { name: "Matcha Latte", price: 140, description: "Matcha + steamed milk. For the matcha lovers out there. We see you." },
+      { name: "Spanish Latte", price: 150, description: "Double shot espresso + steamed milk + condensed milk. Sweet, creamy and comforting." },
       { name: "Piccolo", price: 120, description: "Single shot espresso + steamed milk. Small, strong and smooth." },
     ],
   },
