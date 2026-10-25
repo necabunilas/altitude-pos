@@ -41,6 +41,7 @@ export const MENU = [
       { name: "Ssamjang Biscuit", price: 130, description: "With hot honey." },
       { name: "Butter Croissant", price: 120, description: "Flaky, golden and all butter. The classic." },
       { name: "Pain au Chocolat", price: 140, description: "Buttery croissant dough wrapped around dark chocolate." },
+      { name: "Ham and Cheese Croissant", price: 150, description: "Buttery croissant filled with ham and melted cheese." },
       { name: "Almond Croissant", price: 120, description: "Filled with almond cream and topped with toasted almonds." },
     ],
   },
