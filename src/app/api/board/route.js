@@ -7,8 +7,11 @@ export async function GET() {
   if (!(await isStaffAuthed())) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  // Midnight in Manila (UTC+8, no DST). The server runs in UTC, so a plain
+  // setHours(0) would keep showing yesterday's orders until 8 AM local time.
+  const DAY = 24 * 60 * 60 * 1000;
+  const MANILA = 8 * 60 * 60 * 1000;
+  const startOfToday = new Date(Math.floor((Date.now() + MANILA) / DAY) * DAY - MANILA);
   const [orders, calls, sales] = await Promise.all([
     listOrders({ activeOnly: true }),
     listOpenCalls(),
