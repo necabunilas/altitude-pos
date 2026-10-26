@@ -12,6 +12,7 @@ const { tables, menuCategories, menuItems, orders, orderItems, calls, feedback }
 const DRINK_HINTS = [
   "coffee", "drink", "beverage", "tea", "juice", "shake",
   "frappe", "soda", "water", "smoothie", "latte", "espresso",
+  "add-on", // oat milk, extra shot: drink extras
 ];
 export function categoryKind(name) {
   const n = (name || "").toLowerCase();

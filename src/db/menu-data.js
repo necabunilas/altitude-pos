@@ -51,6 +51,13 @@ export const MENU = [
     category: "Snacks",
     items: [{ name: "Grilled Cheese", price: 150, description: "" }],
   },
+  {
+    category: "Add-ons",
+    items: [
+      { name: "Oat Milk", price: 30, description: "Swap dairy for oat milk in any milk drink." },
+      { name: "Extra Espresso Shot", price: 70, description: "Add a shot of espresso to any drink." },
+    ],
+  },
 ];
 
 export function menuRows(categoryIds) {
