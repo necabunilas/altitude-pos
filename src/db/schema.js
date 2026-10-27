@@ -46,6 +46,9 @@ export const orders = sqliteTable("orders", {
     .references(() => tables.id),
   status: text("status").notNull().default("placed"),
   note: text("note").notNull().default(""),
+  // Name the guest gives when placing a table order (blank for counter orders,
+  // whose name lives on their hidden table's label).
+  customerName: text("customer_name").notNull().default(""),
   // Set when payment is recorded ("Mark paid"); order stays open on the board.
   paidAt: integer("paid_at", { mode: "timestamp" }),
   // How the guest paid: "cash" | "card" (from the bill request).

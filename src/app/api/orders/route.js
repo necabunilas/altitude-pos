@@ -12,7 +12,12 @@ export async function POST(request) {
     return Response.json({ error: "Unknown table" }, { status: 404 });
   }
   try {
-    const order = await placeOrder({ tableId: table.id, cart: body.cart, note: body.note });
+    const order = await placeOrder({
+      tableId: table.id,
+      cart: body.cart,
+      note: body.note,
+      customerName: body.customerName,
+    });
     return Response.json({ ok: true, orderId: order.id }, { status: 201 });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 400 });

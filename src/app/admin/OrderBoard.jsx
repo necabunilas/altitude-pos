@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatPeso, methodLabel } from "@/lib/money";
+import { orderLabel } from "@/lib/orderLabel";
 import DeleteOrderModal from "./DeleteOrderModal";
 import ConfirmModal from "./ConfirmModal";
 import BillModal from "./BillModal";
@@ -205,7 +206,7 @@ export default function OrderBoard() {
               } p-4 flex flex-col`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-semibold">{order.table?.label || "Table"}</span>
+                <span className="font-semibold">{orderLabel(order)}</span>
                 <span className="text-xs text-mocha/70">
                   #{order.id} · {since(order.createdAt)}
                 </span>
@@ -310,9 +311,7 @@ export default function OrderBoard() {
                 className="text-left bg-white border border-ink p-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-ink">
-                    {order.table?.label || "Table"}
-                  </span>
+                  <span className="font-medium text-ink">{orderLabel(order)}</span>
                   <span className="text-xs text-mocha/70">
                     #{order.id} · {since(order.closedAt)}
                   </span>
@@ -356,8 +355,7 @@ export default function OrderBoard() {
             {voiding.item.qty}× {voiding.item.name}
           </div>
           <p className="text-xs text-mocha/70 mt-1">
-            Order #{voiding.order.id}
-            {voiding.order.table?.label ? ` · ${voiding.order.table.label}` : ""}
+            Order #{voiding.order.id} · {orderLabel(voiding.order)}
           </p>
           <p className="text-sm text-mocha mt-4">It will be removed from this order.</p>
         </ConfirmModal>

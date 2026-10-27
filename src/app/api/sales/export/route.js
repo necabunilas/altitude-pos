@@ -19,13 +19,14 @@ export async function GET(request) {
 
   const { sales, summary } = await listSales({ from, to, limit: 100000, offset: 0 });
 
-  const header = ["Order #", "Table", "Closed", "Items", "Total", "Payment", "Ref"];
+  const header = ["Order #", "Table", "Name", "Closed", "Items", "Total", "Payment", "Ref"];
   const lines = [header.join(",")];
   for (const o of sales) {
     lines.push(
       [
         o.id,
         o.table?.label || "",
+        o.customerName || "",
         o.closedAt ? new Date(o.closedAt).toLocaleString("en-PH") : "",
         o.items.reduce((s, i) => s + i.qty, 0),
         (o.totalCents / 100).toFixed(2),

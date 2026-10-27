@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPeso } from "@/lib/money";
+import { orderLabel } from "@/lib/orderLabel";
 import ConfirmModal from "./ConfirmModal";
 
 // Confirm permanently deleting an order. `onConfirm` does the delete and
@@ -10,8 +11,7 @@ export default function DeleteOrderModal({ order, onConfirm, onClose }) {
   return (
     <ConfirmModal title="Delete order?" onConfirm={onConfirm} onClose={onClose}>
       <div className="mt-1 text-mocha">
-        Order #{order.id}
-        {order.table?.label ? ` · ${order.table.label}` : ""}
+        Order #{order.id} · {orderLabel(order)}
       </div>
       <div className="mt-3 font-semibold text-3xl text-espresso">
         {formatPeso(order.totalCents)}

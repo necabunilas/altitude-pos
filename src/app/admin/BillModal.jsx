@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { formatPeso } from "@/lib/money";
+import { orderLabel } from "@/lib/orderLabel";
+import { CARD_ENABLED } from "@/lib/flags";
 import Receipt from "./Receipt";
 
 // Shows every open order for a table as its own receipt, lets staff print each,
@@ -78,7 +80,7 @@ export default function BillModal({
       <div className="relative bg-neutral-100 border border-ink shadow-xl w-full max-w-sm max-h-[90vh] flex flex-col">
         <div className="no-print px-4 py-3 flex items-center justify-between border-b border-ink">
           <h3 className="font-black uppercase tracking-tight flex items-center gap-2">
-            {table.label} · Bill
+            {orders[0] ? orderLabel(orders[0]) : table.label} · Bill
             {requestedMethod && (
               <span
                 className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
@@ -152,7 +154,7 @@ export default function BillModal({
                   </button>
                 </div>
                 <p className="text-[11px] text-neutral-400 text-center">
-                  Card is recorded automatically when the customer pays in the app.
+                  {CARD_ENABLED && "Card is recorded automatically when the customer pays in the app. "}
                   The order stays open until you close it.
                 </p>
                 <button

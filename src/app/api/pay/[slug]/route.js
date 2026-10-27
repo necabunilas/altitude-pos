@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { getTableBySlug, getTableOpenOrders, setTablePaymentPending } from "@/lib/data";
 import { createCheckout } from "@/lib/maya";
-import { TERMINAL_ENABLED } from "@/lib/flags";
+import { CARD_ENABLED, TERMINAL_ENABLED } from "@/lib/flags";
 
 async function baseUrl() {
   if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, "");
@@ -18,7 +18,9 @@ async function baseUrl() {
 // Maya redirects to /api/maya/callback, which verifies and marks the order paid
 // before sending the customer back to their table page.
 export async function POST(request, { params }) {
-  if (!TERMINAL_ENABLED) return Response.json({ error: "Not found" }, { status: 404 });
+  if (!TERMINAL_ENABLED || !CARD_ENABLED) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
   const { slug } = await params;
   const table = await getTableBySlug(slug);
   if (!table) return Response.json({ error: "Unknown table" }, { status: 404 });

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatPeso } from "@/lib/money";
 import DeleteOrderModal from "../DeleteOrderModal";
+import { orderLabel } from "@/lib/orderLabel";
 import { ReceiptModal } from "../Receipt";
 
 function fmt(d) {
@@ -230,7 +231,7 @@ export default function SalesView() {
           <div key={order.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="font-medium">
-                {order.table?.label || "Table"}{" "}
+                {orderLabel(order)}{" "}
                 <span className="text-mocha/70 font-normal">#{order.id}</span>
               </div>
               <div className="text-xs text-mocha truncate">

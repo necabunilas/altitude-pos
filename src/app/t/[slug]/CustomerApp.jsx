@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatPeso, groupItems } from "@/lib/money";
 import { RESTAURANT_NAME, VAT_RATE } from "@/lib/brand";
-import { TERMINAL_ENABLED } from "@/lib/flags";
+import { CARD_ENABLED, TERMINAL_ENABLED } from "@/lib/flags";
 import Footer from "@/app/Footer";
 import { Star } from "@/app/Stars";
 
@@ -23,7 +23,6 @@ const ITEM_STATUS_STYLE = {
 
 export default function CustomerApp({ slug, table, menu }) {
   const [cart, setCart] = useState({}); // { [itemId]: qty }
-  const [note, setNote] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -32,9 +31,20 @@ export default function CustomerApp({ slug, table, menu }) {
   const [myOrders, setMyOrders] = useState([]);
   const [myTotal, setMyTotal] = useState(0);
   const [paidModal, setPaidModal] = useState(null);
+  // Guest's name for the order, remembered on this phone for next time.
+  const [customerName, setCustomerName] = useState(() => {
+    try {
+      return localStorage.getItem("guestName") || "";
+    } catch {
+      return "";
+    }
+  });
 
   const order = myOrders[0] || null; // one active order per table
   const paid = !!order?.paidAt; // once paid, no more items can be added
+  // Ask for a name on the table's first order (or if the open one has none).
+  const needsName = !order?.customerName;
+  const nameMissing = needsName && !customerName.trim();
 
   // Pop a "payment received" confirmation when the bill flips to paid — covers
   // both cash (staff marks paid) and card/QR (Maya callback). Only fires on a
@@ -92,6 +102,18 @@ export default function CustomerApp({ slug, table, menu }) {
       show("Bill already paid.", "err");
       return;
     }
+    if (nameMissing) {
+      show("Please enter your name.", "err");
+      return;
+    }
+    const name = customerName.trim();
+    if (needsName) {
+      try {
+        localStorage.setItem("guestName", name);
+      } catch {
+        /* private mode: just don't remember it */
+      }
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/orders", {
@@ -99,13 +121,12 @@ export default function CustomerApp({ slug, table, menu }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug,
-          note,
+          customerName: needsName ? name : "",
           cart: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),
         }),
       });
       if (res.ok) {
         setCart({});
-        setNote("");
         setCartOpen(false);
         show(order ? "Added to your order!" : "Order sent to the kitchen!");
         await loadMyOrders();
@@ -376,23 +397,34 @@ export default function CustomerApp({ slug, table, menu }) {
                 <Stepper qty={l.qty} onChange={(q) => setQty(l.item.id, q)} />
               </div>
             ))}
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Notes for the kitchen (allergies, no onions…)"
-              className="w-full border border-ink p-2.5 text-sm focus:outline-none focus:border-brass"
-              rows={2}
-            />
+            {needsName && (
+              <label className="block">
+                <span className="text-xs uppercase tracking-[0.15em] text-brass-dark">Your name</span>
+                <input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value.slice(0, 40))}
+                  placeholder="So we know who to serve"
+                  autoComplete="given-name"
+                  className="mt-1 w-full border border-ink p-2.5 text-base focus:outline-none focus:border-brass"
+                />
+              </label>
+            )}
             <div className="flex items-center justify-between pt-2 border-t border-sand">
               <span className="text-mocha">Total</span>
               <span className="font-semibold text-lg">{formatPeso(total)}</span>
             </div>
             <button
-              disabled={busy}
+              disabled={busy || nameMissing}
               onClick={placeOrder}
               className="w-full bg-espresso text-cream py-3.5 font-black uppercase tracking-wide text-sm disabled:opacity-50 active:scale-[0.99] transition"
             >
-              {busy ? "Sending…" : order ? "Add to order" : "Place order"}
+              {busy
+                ? "Sending…"
+                : nameMissing
+                ? "Enter your name to order"
+                : order
+                ? "Add to order"
+                : "Place order"}
             </button>
           </div>
         </Sheet>
@@ -438,7 +470,7 @@ export default function CustomerApp({ slug, table, menu }) {
           ) : (
             <p className="text-mocha mb-4">No active order yet. Order something first.</p>
           )}
-          {TERMINAL_ENABLED ? (
+          {CARD_ENABLED && TERMINAL_ENABLED ? (
             <div className="space-y-3">
               <button
                 onClick={payByCard}
@@ -477,13 +509,23 @@ export default function CustomerApp({ slug, table, menu }) {
                   <div className="text-2xl">💵</div>
                   <div className="mt-1.5 font-black uppercase tracking-wide text-sm">Cash</div>
                 </button>
-                <button
-                  onClick={() => askBill("card")}
-                  className="border-2 border-ink bg-white py-6 active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
-                >
-                  <div className="text-2xl">💳</div>
-                  <div className="mt-1.5 font-black uppercase tracking-wide text-sm">Card</div>
-                </button>
+                {CARD_ENABLED ? (
+                  <button
+                    onClick={() => askBill("card")}
+                    className="border-2 border-ink bg-white py-6 active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
+                  >
+                    <div className="text-2xl">💳</div>
+                    <div className="mt-1.5 font-black uppercase tracking-wide text-sm">Card</div>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => askBill("qr")}
+                    className="border-2 border-ink bg-white py-6 active:scale-[0.98] hover:bg-ink hover:text-white transition-colors"
+                  >
+                    <div className="text-2xl">📱</div>
+                    <div className="mt-1.5 font-black uppercase tracking-wide text-sm">QR</div>
+                  </button>
+                )}
               </div>
             </>
           )}

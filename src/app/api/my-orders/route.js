@@ -15,6 +15,7 @@ export async function GET(request) {
     paidAt: o.paidAt,
     createdAt: o.createdAt,
     note: o.note,
+    customerName: o.customerName,
     items: o.items.map((i) => ({
       id: i.id,
       name: i.name,

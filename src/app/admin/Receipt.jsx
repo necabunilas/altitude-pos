@@ -49,6 +49,7 @@ export default function Receipt({ order, printable = true }) {
 
       <Row label="Receipt No." value={`#${String(order.id).padStart(6, "0")}`} />
       <Row label="Table" value={order.table?.label || "—"} />
+      {order.customerName && <Row label="Name" value={order.customerName} />}
       <Row label="Date" value={fmtDateTime(order.createdAt)} />
 
       <Rule />

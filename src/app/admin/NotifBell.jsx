@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { orderLabel } from "@/lib/orderLabel";
 
 function since(ts) {
   const secs = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
@@ -60,7 +61,7 @@ export default function NotifBell({
       href: "/admin",
       icon: "🍽️",
       title: "New order",
-      sub: `${o.table?.label || "Table"} · #${o.id} · ${since(o.createdAt)}`,
+      sub: `${orderLabel(o)} · #${o.id} · ${since(o.createdAt)}`,
       accent: "bg-emerald-500",
     });
   }

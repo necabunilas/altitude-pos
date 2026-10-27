@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatPeso } from "@/lib/money";
+import { CARD_ENABLED } from "@/lib/flags";
 
 // Display names for the tender chosen at the counter.
 const METHOD_LABEL = { cash: "Cash", card: "Card", qr: "QR" };
@@ -236,7 +237,9 @@ export default function CounterOrder({ menu }) {
               ["cash", "💵 Cash"],
               ["card", "💳 Card"],
               ["qr", "📱 QR"],
-            ].map(([v, l]) => (
+            ]
+              .filter(([v]) => v !== "card" || CARD_ENABLED)
+              .map(([v, l]) => (
               <button
                 key={v}
                 onClick={() => setPayMethod(v)}

@@ -40,7 +40,8 @@ export async function getMenu({ onlyAvailable = false } = {}) {
 }
 
 // Create an order from a cart of { menuItemId, qty, note }.
-export async function placeOrder({ tableId, cart, note = "" }) {
+export async function placeOrder({ tableId, cart, note = "", customerName = "" }) {
+  const cleanName = String(customerName || "").trim().slice(0, 40);
   const ids = cart.map((c) => c.menuItemId);
   const found = ids.length
     ? await db.select().from(menuItems).where(inArray(menuItems.id, ids)).all()
@@ -90,13 +91,17 @@ export async function placeOrder({ tableId, cart, note = "" }) {
         const merged = ((existing.note ? existing.note + " | " : "") + cleanNote).slice(0, 300);
         await db.update(orders).set({ note: merged }).where(eq(orders.id, existing.id)).run();
       }
+      // Keep the first name given; only fill it in if the order has none yet.
+      if (cleanName && !existing.customerName) {
+        await db.update(orders).set({ customerName: cleanName }).where(eq(orders.id, existing.id)).run();
+      }
       return { id: existing.id, appended: true };
     }
 
     try {
       const order = await db
         .insert(orders)
-        .values({ tableId, note: String(note || "").slice(0, 300) })
+        .values({ tableId, note: String(note || "").slice(0, 300), customerName: cleanName })
         .returning()
         .get();
 
