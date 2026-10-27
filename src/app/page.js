@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { RESTAURANT_NAME, RESTAURANT_TAGLINE, RESTAURANT_DESCRIPTION } from "@/lib/brand";
+import BannerAlerts from "./BannerAlerts";
 
 // Splash screen for the counter device: brand name + caption. Tapping anywhere
 // opens the counter order page (staff login first if not signed in).
@@ -23,6 +24,7 @@ export default function Home() {
       <p className="absolute bottom-10 inset-x-0 text-center text-xs tracking-[0.3em] uppercase text-white/40 animate-pulse">
         Tap anywhere to start
       </p>
+      <BannerAlerts />
     </Link>
   );
 }
