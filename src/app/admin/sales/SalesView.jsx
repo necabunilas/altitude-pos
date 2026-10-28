@@ -30,6 +30,68 @@ function presetRange(kind) {
   return { from: to, to }; // today
 }
 
+// yyyy-mm-dd -> local Date (midnight), and day arithmetic on it.
+function parse(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+function addDays(s, n) {
+  const d = parse(s);
+  d.setDate(d.getDate() + n);
+  return fmt(d);
+}
+function mondayOf(s) {
+  const d = parse(s);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return fmt(d);
+}
+function minStr(a, b) {
+  return a < b ? a : b;
+}
+
+// Step the range back (-1) or forward (+1) by its own unit: a day, a Mon–Sun
+// week, a calendar month, or (custom) the same number of days. The end never
+// goes past today.
+function shiftRange(unit, from, to, dir) {
+  const today = todayStr();
+  if (unit === "day") {
+    const d = addDays(from, dir);
+    return { from: d, to: d };
+  }
+  if (unit === "week") {
+    const start = addDays(mondayOf(from), 7 * dir);
+    return { from: start, to: minStr(addDays(start, 6), today) };
+  }
+  if (unit === "month") {
+    const f = parse(from);
+    const start = new Date(f.getFullYear(), f.getMonth() + dir, 1);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    return { from: fmt(start), to: minStr(fmt(end), today) };
+  }
+  const len = Math.round((parse(to) - parse(from)) / 86400000) + 1;
+  return { from: addDays(from, len * dir), to: minStr(addDays(to, len * dir), today) };
+}
+
+function shortDate(s, withWeekday = false) {
+  return parse(s).toLocaleDateString("en-PH", {
+    ...(withWeekday && { weekday: "short" }),
+    month: "short",
+    day: "numeric",
+  });
+}
+
+// Human label for the current range: "Today", "Yesterday · Mon, Oct 27",
+// "Oct 20 – Oct 26".
+function rangeLabel(from, to) {
+  const today = todayStr();
+  if (from === to) {
+    if (from === today) return `Today · ${shortDate(from, true)}`;
+    if (from === addDays(today, -1)) return `Yesterday · ${shortDate(from, true)}`;
+    return shortDate(from, true);
+  }
+  return `${shortDate(from)} – ${shortDate(to)}`;
+}
+
 // Convert a yyyy-mm-dd (local) to ISO instants for the day's start/end.
 function dayRange(from, to) {
   const start = new Date(`${from}T00:00:00`);
@@ -47,6 +109,8 @@ export default function SalesView() {
   const [loading, setLoading] = useState(false);
   const [viewOrder, setViewOrder] = useState(null);
   const [preset, setPreset] = useState("today");
+  // What the ‹ › arrows step by: "day" | "week" | "month" | "custom".
+  const [unit, setUnit] = useState("day");
   const [deleting, setDeleting] = useState(null); // order awaiting delete confirmation
 
   function applyPreset(kind) {
@@ -54,7 +118,20 @@ export default function SalesView() {
     setFrom(r.from);
     setTo(r.to);
     setPreset(kind);
+    setUnit(kind === "today" ? "day" : kind);
   }
+
+  function step(dir) {
+    const r = shiftRange(unit, from, to, dir);
+    if (r.from > todayStr()) return;
+    setFrom(r.from);
+    setTo(r.to);
+    // Re-highlight a preset when stepping lands back on it.
+    const p = presetRange(unit === "day" ? "today" : unit);
+    const back = unit !== "custom" && r.from === p.from && r.to === p.to;
+    setPreset(back ? (unit === "day" ? "today" : unit) : "custom");
+  }
+  const canGoForward = shiftRange(unit, from, to, 1).from <= todayStr();
 
   // Fetch a page. `offset === 0` replaces the list; otherwise it appends.
   const fetchPage = useCallback(
@@ -147,6 +224,28 @@ export default function SalesView() {
         </button>
       </div>
 
+      {/* Day / period stepper */}
+      <div className="flex items-stretch border border-ink bg-white">
+        <button
+          onClick={() => step(-1)}
+          aria-label="Previous"
+          className="px-4 text-2xl leading-none font-black hover:bg-ink hover:text-white transition-colors"
+        >
+          ‹
+        </button>
+        <div className="flex-1 text-center py-2.5 font-black uppercase tracking-wide text-sm border-x border-ink">
+          {rangeLabel(from, to)}
+        </div>
+        <button
+          onClick={() => step(1)}
+          disabled={!canGoForward}
+          aria-label="Next"
+          className="px-4 text-2xl leading-none font-black hover:bg-ink hover:text-white transition-colors disabled:opacity-25 disabled:hover:bg-white disabled:hover:text-ink"
+        >
+          ›
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
           <span className="block text-mocha text-xs mb-1">From</span>
@@ -157,6 +256,7 @@ export default function SalesView() {
             onChange={(e) => {
               setFrom(e.target.value);
               setPreset("custom");
+              setUnit(e.target.value === to ? "day" : "custom");
             }}
             className="border border-ink px-2 py-1.5 focus:outline-none focus:border-brass"
           />
@@ -170,6 +270,7 @@ export default function SalesView() {
             onChange={(e) => {
               setTo(e.target.value);
               setPreset("custom");
+              setUnit(e.target.value === from ? "day" : "custom");
             }}
             className="border border-ink px-2 py-1.5 focus:outline-none focus:border-brass"
           />
