@@ -297,7 +297,7 @@ export default function OrderBoard() {
             className="w-full flex items-center gap-2 mb-3"
           >
             <h2 className="font-display text-2xl text-espresso">
-              Closed today ({closedSummary.count}) · {formatPeso(closedSummary.revenueCents)}
+              Closed today ({closedSummary.count})
             </h2>
             <span className={`text-mocha transition-transform ${showClosed ? "rotate-90" : ""}`}>
               ›
