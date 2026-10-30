@@ -44,6 +44,10 @@ export default function CounterOrder({ menu }) {
   const short = isCash && changeCents !== null && changeCents < 0;
   // Quick-tap bills: the common notes that cover the total.
   const quickBills = [100, 200, 500, 1000].filter((b) => b * 100 >= total).slice(0, 3);
+  // Pay later: the order goes to the board unpaid and is billed there. Needs a
+  // name so staff know whose tab it is.
+  const isLater = payMethod === "later";
+  const nameMissing = isLater && !name.trim();
 
   const setQty = (id, qty) => setCart((c) => ({ ...c, [id]: Math.max(0, Math.min(50, qty)) }));
   const clearCart = () => {
@@ -67,7 +71,7 @@ export default function CounterOrder({ menu }) {
   }
 
   async function placeOrder() {
-    if (!count || busy || short) return;
+    if (!count || busy || short || nameMissing) return;
     setBusy(true);
     try {
       const res = await fetch("/api/staff-order", {
@@ -76,7 +80,7 @@ export default function CounterOrder({ menu }) {
         body: JSON.stringify({
           label: name,
           note,
-          paymentMethod: payMethod,
+          paymentMethod: isLater ? null : payMethod,
           cart: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),
         }),
       });
@@ -221,7 +225,7 @@ export default function CounterOrder({ menu }) {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Customer name (optional)"
+              placeholder={isLater ? "Customer name (required)" : "Customer name (optional)"}
               className="flex-1 min-w-[140px] border border-ink px-3 py-2 text-sm bg-white focus:outline-none focus:border-brass"
             />
             <input
@@ -231,12 +235,13 @@ export default function CounterOrder({ menu }) {
               className="flex-1 min-w-[140px] border border-ink px-3 py-2 text-sm bg-white focus:outline-none focus:border-brass"
             />
           </div>
-          {/* Payment choice (counter is pay-first) */}
+          {/* Payment choice: pay now, or pay later (billed from the board) */}
           <div className="flex gap-2">
             {[
               ["cash", "💵 Cash"],
               ["card", "💳 Card"],
               ["qr", "📱 QR"],
+              ["later", "🕒 Pay later"],
             ]
               .filter(([v]) => v !== "card" || CARD_ENABLED)
               .map(([v, l]) => (
@@ -302,13 +307,17 @@ export default function CounterOrder({ menu }) {
             </button>
             <button
               onClick={placeOrder}
-              disabled={!count || busy || short}
+              disabled={!count || busy || short || nameMissing}
               className="flex-1 py-3 bg-emerald-600 text-white font-black uppercase tracking-wide disabled:opacity-40"
             >
               {busy
                 ? "Placing…"
                 : !count
                 ? "Add items to start"
+                : nameMissing
+                ? "Enter a name to pay later"
+                : isLater
+                ? `Place · pay later · ${formatPeso(total)}`
                 : `Place & pay ${METHOD_LABEL[payMethod] || payMethod} · ${formatPeso(total)}`}
             </button>
           </div>
