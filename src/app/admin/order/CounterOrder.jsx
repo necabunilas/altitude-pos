@@ -110,13 +110,6 @@ export default function CounterOrder({ menu }) {
 
   return (
     <div className="p-4 max-w-4xl mx-auto pb-44">
-      <div className="flex items-center gap-2 mb-3">
-        <h1 className="font-display text-3xl text-espresso mr-auto">Counter order</h1>
-        <Link href="/admin" className="text-sm text-mocha hover:text-espresso">
-          View board →
-        </Link>
-      </div>
-
       {/* Search */}
       <input
         value={query}
