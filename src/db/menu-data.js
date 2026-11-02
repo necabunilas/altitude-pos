@@ -60,6 +60,14 @@ export const MENU = [
   },
 ];
 
+// Drinks made with milk: these ask for dairy or oat milk when ordered.
+const MILK_DRINKS = new Set([
+  "Flat White", "Latte", "Cortado", "Dirty Matcha Latte", "Duet", "Hot Chocolate",
+  "Matcha Latte", "Spanish Latte", "Piccolo", "Coco Brew", "Coco Matcha",
+  "Iced Dirty Matcha Latte", "Iced Choco", "Iced Matcha Latte", "Mocha Brew",
+  "White Brew", "Iced Ube Latte",
+]);
+
 export function menuRows(categoryIds) {
   return MENU.flatMap((c) =>
     c.items.map((it, i) => ({
@@ -68,6 +76,7 @@ export function menuRows(categoryIds) {
       description: it.description,
       priceCents: it.price * 100,
       sortOrder: i + 1,
+      milkOption: MILK_DRINKS.has(it.name),
     }))
   );
 }

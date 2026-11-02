@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatPeso } from "@/lib/money";
 import { CARD_ENABLED } from "@/lib/flags";
+import MilkPicker from "@/app/MilkPicker";
+import { cartKey, parseCartKey, milkExtra, milkLineName } from "@/lib/milk";
 
 // Display names for the tender chosen at the counter.
 const METHOD_LABEL = { cash: "Cash", card: "Card", qr: "QR" };
@@ -11,7 +13,8 @@ const METHOD_LABEL = { cash: "Cash", card: "Card", qr: "QR" };
 // Staff-facing counter / bar order entry. Builds a cart from the menu and rings
 // it up as a standalone order (its own hidden table) that appears on the board.
 export default function CounterOrder({ menu }) {
-  const [cart, setCart] = useState({}); // { [itemId]: qty }
+  const [cart, setCart] = useState({}); // { [cartKey]: qty }, key "id" or "id:milk"
+  const [picking, setPicking] = useState(null); // milk drink awaiting dairy/oat choice
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -31,9 +34,21 @@ export default function CounterOrder({ menu }) {
 
   const lines = Object.entries(cart)
     .filter(([, q]) => q > 0)
-    .map(([id, qty]) => ({ item: itemsById[Number(id)], qty }))
-    .filter((l) => l.item);
-  const total = lines.reduce((s, l) => s + l.item.priceCents * l.qty, 0);
+    .map(([key, qty]) => {
+      const { id, milk } = parseCartKey(key);
+      const item = itemsById[id];
+      if (!item) return null;
+      return {
+        key,
+        item,
+        milk,
+        qty,
+        name: milkLineName(item.name, milk),
+        priceCents: item.priceCents + milkExtra(milk),
+      };
+    })
+    .filter(Boolean);
+  const total = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
   const count = lines.reduce((s, l) => s + l.qty, 0);
 
   // Cash tendered + change. Blank means exact amount.
@@ -49,7 +64,14 @@ export default function CounterOrder({ menu }) {
   const isLater = payMethod === "later";
   const nameMissing = isLater && !name.trim();
 
-  const setQty = (id, qty) => setCart((c) => ({ ...c, [id]: Math.max(0, Math.min(50, qty)) }));
+  const setQty = (key, qty) => setCart((c) => ({ ...c, [key]: Math.max(0, Math.min(50, qty)) }));
+  // How many of an item are in the cart across milk choices.
+  const itemQty = (id) => lines.filter((l) => l.item.id === id).reduce((s, l) => s + l.qty, 0);
+  function pickMilk(milk) {
+    const key = cartKey(picking.id, milk);
+    setCart((c) => ({ ...c, [key]: Math.min(50, (c[key] || 0) + 1) }));
+    setPicking(null);
+  }
   const clearCart = () => {
     setCart({});
     setShowCart(true);
@@ -81,7 +103,7 @@ export default function CounterOrder({ menu }) {
           label: name,
           note,
           paymentMethod: isLater ? null : payMethod,
-          cart: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),
+          cart: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty, milk: l.milk })),
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -139,7 +161,7 @@ export default function CounterOrder({ menu }) {
           <h2 className="font-display text-xl text-espresso mb-3">{cat.name}</h2>
           <div className="grid gap-2 sm:grid-cols-2">
             {cat.items.map((it) => {
-              const qty = cart[it.id] || 0;
+              const qty = it.milkOption ? itemQty(it.id) : cart[it.id] || 0;
               return (
                 <div
                   key={it.id}
@@ -151,7 +173,15 @@ export default function CounterOrder({ menu }) {
                     <div className="font-medium truncate">{it.name}</div>
                     <div className="text-sm text-mocha">{formatPeso(it.priceCents)}</div>
                   </div>
-                  {qty > 0 ? (
+                  {it.milkOption ? (
+                    // Milk drinks: each Add asks dairy or oat; remove in the order list.
+                    <button
+                      onClick={() => setPicking(it)}
+                      className="px-3 py-1.5 bg-ink text-white text-xs font-black uppercase tracking-wide"
+                    >
+                      {qty > 0 ? `Add · ${qty}` : "Add"}
+                    </button>
+                  ) : qty > 0 ? (
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setQty(it.id, qty - 1)}
@@ -195,15 +225,15 @@ export default function CounterOrder({ menu }) {
             </div>
             <div className="space-y-1.5">
               {lines.map((l) => (
-                <div key={l.item.id} className="flex items-center gap-2 text-sm">
+                <div key={l.key} className="flex items-center gap-2 text-sm">
                   <span className="flex-1 truncate">
-                    <span className="font-medium">{l.qty}×</span> {l.item.name}
+                    <span className="font-medium">{l.qty}×</span> {l.name}
                   </span>
-                  <span className="tabular-nums">{formatPeso(l.item.priceCents * l.qty)}</span>
+                  <span className="tabular-nums">{formatPeso(l.priceCents * l.qty)}</span>
                   <button
-                    onClick={() => setQty(l.item.id, 0)}
+                    onClick={() => setQty(l.key, l.qty - 1)}
                     className="text-mocha/40 hover:text-red-600 leading-none text-lg"
-                    title="Remove"
+                    title="Remove one"
                   >
                     ×
                   </button>
@@ -316,6 +346,10 @@ export default function CounterOrder({ menu }) {
           </div>
         </div>
       </div>
+
+      {picking && (
+        <MilkPicker item={picking} onPick={pickMilk} onClose={() => setPicking(null)} />
+      )}
 
       {placed && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">

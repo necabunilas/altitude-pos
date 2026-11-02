@@ -24,6 +24,16 @@ export default function MenuManager({ initialMenu }) {
     reload();
   }
 
+  // Milk drinks ask for dairy or oat milk when ordered.
+  async function toggleMilk(item) {
+    await fetch(`/api/menu/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ milkOption: !item.milkOption }),
+    });
+    reload();
+  }
+
   async function remove(item) {
     const res = await fetch(`/api/menu/items/${item.id}`, { method: "DELETE" });
     const d = await res.json().catch(() => ({}));
@@ -79,6 +89,21 @@ export default function MenuManager({ initialMenu }) {
                   </div>
                 </div>
                 <EditPrice item={item} onDone={reload} />
+                <button
+                  onClick={() => toggleMilk(item)}
+                  title={
+                    item.milkOption
+                      ? "Asks dairy or oat milk. Tap to turn off"
+                      : "Tap to ask dairy or oat milk when ordered"
+                  }
+                  className={`text-[11px] font-black uppercase tracking-wide px-2.5 py-1 border transition-colors ${
+                    item.milkOption
+                      ? "border-ink bg-ink text-white hover:bg-espresso-light"
+                      : "border-neutral-300 text-mocha/60 hover:bg-neutral-200"
+                  }`}
+                >
+                  🥛 Milk
+                </button>
                 <button
                   onClick={() => toggle(item)}
                   title={item.available ? "Tap to hide from menu" : "Tap to make available"}

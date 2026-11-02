@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
+import { milkExtra, milkLineName } from "@/lib/milk";
 
 const { tables, menuCategories, menuItems, orders, orderItems, calls, feedback } =
   schema;
@@ -53,10 +54,12 @@ export async function placeOrder({ tableId, cart, note = "", customerName = "" }
       const item = byId[c.menuItemId];
       if (!item || !item.available) return null;
       const qty = Math.max(1, Math.min(50, Number(c.qty) || 1));
+      // Milk drinks: oat milk adds a surcharge and shows in the line name.
+      const milk = item.milkOption && c.milk === "oat" ? "oat" : null;
       return {
         menuItemId: item.id,
-        name: item.name,
-        priceCents: item.priceCents,
+        name: milkLineName(item.name, milk),
+        priceCents: item.priceCents + milkExtra(milk),
         qty,
         note: String(c.note || "").slice(0, 200),
       };
@@ -488,7 +491,7 @@ export async function placeCounterOrder({ label, cart, note = "", paymentMethod 
 
 // ---- Menu management (staff) ----
 
-export async function createMenuItem({ categoryId, name, description, priceCents, sortOrder }) {
+export async function createMenuItem({ categoryId, name, description, priceCents, sortOrder, milkOption }) {
   return db
     .insert(menuItems)
     .values({
@@ -497,6 +500,7 @@ export async function createMenuItem({ categoryId, name, description, priceCents
       description: String(description || "").slice(0, 300),
       priceCents: Math.max(0, Math.round(Number(priceCents) || 0)),
       sortOrder: Number(sortOrder) || 0,
+      milkOption: !!milkOption,
     })
     .returning()
     .get();
@@ -510,6 +514,7 @@ export async function updateMenuItem(id, patch) {
   if (patch.available != null) fields.available = !!patch.available;
   if (patch.categoryId != null) fields.categoryId = Number(patch.categoryId);
   if (patch.sortOrder != null) fields.sortOrder = Number(patch.sortOrder);
+  if (patch.milkOption != null) fields.milkOption = !!patch.milkOption;
   if (!Object.keys(fields).length) return null;
   return db.update(menuItems).set(fields).where(eq(menuItems.id, id)).returning().get();
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `menu_items` ADD `milk_option` integer DEFAULT false NOT NULL;

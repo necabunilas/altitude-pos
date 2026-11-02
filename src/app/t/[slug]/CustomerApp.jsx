@@ -6,6 +6,8 @@ import { RESTAURANT_NAME, VAT_RATE } from "@/lib/brand";
 import { CARD_ENABLED, TERMINAL_ENABLED } from "@/lib/flags";
 import Footer from "@/app/Footer";
 import { Star } from "@/app/Stars";
+import MilkPicker from "@/app/MilkPicker";
+import { cartKey, parseCartKey, milkExtra, milkLineName } from "@/lib/milk";
 
 const ORDER_STATUS = {
   placed: { label: "Order received", color: "bg-sand text-espresso", step: 1 },
@@ -22,7 +24,8 @@ const ITEM_STATUS_STYLE = {
 };
 
 export default function CustomerApp({ slug, table, menu }) {
-  const [cart, setCart] = useState({}); // { [itemId]: qty }
+  const [cart, setCart] = useState({}); // { [cartKey]: qty }, key "id" or "id:milk"
+  const [picking, setPicking] = useState(null); // milk drink awaiting dairy/oat choice
   const [cartOpen, setCartOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -86,15 +89,35 @@ export default function CustomerApp({ slug, table, menu }) {
 
   const lines = Object.entries(cart)
     .filter(([, q]) => q > 0)
-    .map(([id, qty]) => ({ item: itemsById[Number(id)], qty }));
-  const total = lines.reduce((s, l) => s + l.item.priceCents * l.qty, 0);
+    .map(([key, qty]) => {
+      const { id, milk } = parseCartKey(key);
+      const item = itemsById[id];
+      if (!item) return null;
+      return {
+        key,
+        item,
+        milk,
+        qty,
+        name: milkLineName(item.name, milk),
+        priceCents: item.priceCents + milkExtra(milk),
+      };
+    })
+    .filter(Boolean);
+  const total = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
   const count = lines.reduce((s, l) => s + l.qty, 0);
 
   function show(msg, kind = "ok") {
     setToast({ msg, kind });
     setTimeout(() => setToast(null), 2500);
   }
-  const setQty = (id, qty) => setCart((c) => ({ ...c, [id]: Math.max(0, qty) }));
+  const setQty = (key, qty) => setCart((c) => ({ ...c, [key]: Math.max(0, qty) }));
+  // How many of an item are in the cart across milk choices.
+  const itemQty = (id) => lines.filter((l) => l.item.id === id).reduce((s, l) => s + l.qty, 0);
+  function pickMilk(milk) {
+    const key = cartKey(picking.id, milk);
+    setCart((c) => ({ ...c, [key]: (c[key] || 0) + 1 }));
+    setPicking(null);
+  }
 
   async function placeOrder() {
     if (!count || busy) return;
@@ -122,7 +145,7 @@ export default function CustomerApp({ slug, table, menu }) {
         body: JSON.stringify({
           slug,
           customerName: needsName ? name : "",
-          cart: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),
+          cart: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty, milk: l.milk })),
         }),
       });
       if (res.ok) {
@@ -353,11 +376,29 @@ export default function CustomerApp({ slug, table, menu }) {
                       {formatPeso(item.priceCents)}
                     </div>
                   </div>
-                  <Stepper
-                    qty={cart[item.id] || 0}
-                    onChange={(q) => setQty(item.id, q)}
-                    disabled={paid}
-                  />
+                  {item.milkOption ? (
+                    // Milk drinks: each Add asks dairy or oat; adjust in the cart.
+                    <div className="shrink-0 flex flex-col items-end gap-1">
+                      <button
+                        onClick={() => setPicking(item)}
+                        disabled={paid}
+                        className="h-9 px-5 bg-ink text-white text-xs font-black uppercase tracking-wide active:scale-95 transition disabled:opacity-30"
+                      >
+                        Add
+                      </button>
+                      {itemQty(item.id) > 0 && (
+                        <span className="text-[11px] font-bold text-brass-dark">
+                          {itemQty(item.id)} in order
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <Stepper
+                      qty={cart[item.id] || 0}
+                      onChange={(q) => setQty(item.id, q)}
+                      disabled={paid}
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -371,6 +412,10 @@ export default function CustomerApp({ slug, table, menu }) {
       </main>
 
       <Footer />
+
+      {picking && (
+        <MilkPicker item={picking} onPick={pickMilk} onClose={() => setPicking(null)} />
+      )}
 
       {/* Floating cart bar — shows whenever items are selected. */}
       {count > 0 && !cartOpen && (
@@ -389,12 +434,12 @@ export default function CustomerApp({ slug, table, menu }) {
         <Sheet onClose={() => setCartOpen(false)} title={order ? "Add to your order" : "Your order"}>
           <div className="space-y-3">
             {lines.map((l) => (
-              <div key={l.item.id} className="flex items-center gap-3">
+              <div key={l.key} className="flex items-center gap-3">
                 <div className="flex-1">
-                  <div className="font-medium">{l.item.name}</div>
-                  <div className="text-sm text-mocha">{formatPeso(l.item.priceCents)}</div>
+                  <div className="font-medium">{l.name}</div>
+                  <div className="text-sm text-mocha">{formatPeso(l.priceCents)}</div>
                 </div>
-                <Stepper qty={l.qty} onChange={(q) => setQty(l.item.id, q)} />
+                <Stepper qty={l.qty} onChange={(q) => setQty(l.key, q)} />
               </div>
             ))}
             {needsName && (
