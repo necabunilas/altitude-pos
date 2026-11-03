@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatPeso } from "@/lib/money";
+import { categoryKind } from "@/lib/categoryKind";
 import ConfirmModal from "../ConfirmModal";
 
 export default function MenuManager({ initialMenu }) {
@@ -88,7 +89,8 @@ export default function MenuManager({ initialMenu }) {
                     {item.description ? ` · ${item.description}` : ""}
                   </div>
                 </div>
-                <EditStock item={item} onDone={reload} />
+                {/* Stock is for food only; drinks are unlimited. */}
+                {categoryKind(cat.name) === "food" && <EditStock item={item} onDone={reload} />}
                 <EditPrice item={item} onDone={reload} />
                 <button
                   onClick={() => toggleMilk(item)}

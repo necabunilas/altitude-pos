@@ -1,24 +1,15 @@
 import { db, schema } from "@/db";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
 import { milkExtra, milkLineName } from "@/lib/milk";
+import { categoryKind } from "@/lib/categoryKind";
 
 const { tables, menuCategories, menuItems, orders, orderItems, calls, feedback } =
   schema;
 
 // libSQL is async — every helper here returns a Promise and must be awaited.
 
-// Classify a menu category as a drink or food for accounting roll-ups. A
-// category counts as a drink if its name contains any of these hints; add to
-// the list if you introduce new drink categories.
-const DRINK_HINTS = [
-  "coffee", "drink", "beverage", "tea", "juice", "shake",
-  "frappe", "soda", "water", "smoothie", "latte", "espresso",
-  "add-on", // oat milk, extra shot: drink extras
-];
-export function categoryKind(name) {
-  const n = (name || "").toLowerCase();
-  return DRINK_HINTS.some((h) => n.includes(h)) ? "drink" : "food";
-}
+// Drink vs food split lives in its own module so client components can use it.
+export { categoryKind };
 
 export async function getTableBySlug(slug) {
   return db.select().from(tables).where(eq(tables.slug, slug)).get();
