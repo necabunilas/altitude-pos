@@ -92,21 +92,24 @@ export default function MenuManager({ initialMenu }) {
                 {/* Stock is for food only; drinks are unlimited. */}
                 {categoryKind(cat.name) === "food" && <EditStock item={item} onDone={reload} />}
                 <EditPrice item={item} onDone={reload} />
-                <button
-                  onClick={() => toggleMilk(item)}
-                  title={
-                    item.milkOption
-                      ? "Asks dairy or oat milk. Tap to turn off"
-                      : "Tap to ask dairy or oat milk when ordered"
-                  }
-                  className={`text-[11px] font-black uppercase tracking-wide px-2.5 py-1 border transition-colors ${
-                    item.milkOption
-                      ? "border-ink bg-ink text-white hover:bg-espresso-light"
-                      : "border-neutral-300 text-mocha/60 hover:bg-neutral-200"
-                  }`}
-                >
-                  🥛 Milk
-                </button>
+                {/* Milk choice is for drinks only. */}
+                {categoryKind(cat.name) === "drink" && (
+                  <button
+                    onClick={() => toggleMilk(item)}
+                    title={
+                      item.milkOption
+                        ? "Asks dairy or oat milk. Tap to turn off"
+                        : "Tap to ask dairy or oat milk when ordered"
+                    }
+                    className={`text-[11px] font-black uppercase tracking-wide px-2.5 py-1 border transition-colors ${
+                      item.milkOption
+                        ? "border-ink bg-ink text-white hover:bg-espresso-light"
+                        : "border-neutral-300 text-mocha/60 hover:bg-neutral-200"
+                    }`}
+                  >
+                    🥛 Milk
+                  </button>
+                )}
                 <button
                   onClick={() => toggle(item)}
                   title={item.available ? "Tap to hide from menu" : "Tap to make available"}
