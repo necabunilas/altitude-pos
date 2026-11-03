@@ -88,6 +88,7 @@ export default function MenuManager({ initialMenu }) {
                     {item.description ? ` · ${item.description}` : ""}
                   </div>
                 </div>
+                <EditStock item={item} onDone={reload} />
                 <EditPrice item={item} onDone={reload} />
                 <button
                   onClick={() => toggleMilk(item)}
@@ -231,6 +232,74 @@ function AddItem({ categoryId, onDone }) {
         Cancel
       </button>
     </div>
+  );
+}
+
+// Pieces left for food. Ordering takes from it right away; blank = not tracked.
+function EditStock({ item, onDone }) {
+  const tracked = item.stock !== null && item.stock !== undefined;
+  const [editing, setEditing] = useState(false);
+  const [stock, setStock] = useState(tracked ? String(item.stock) : "");
+
+  async function save() {
+    await fetch(`/api/menu/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stock: stock.trim() }),
+    });
+    setEditing(false);
+    onDone();
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => {
+          setStock(tracked ? String(item.stock) : "");
+          setEditing(true);
+        }}
+        title={tracked ? "Edit stock" : "Track stock for this item"}
+        className={`text-[11px] font-black uppercase tracking-wide px-2.5 py-1 border tabular-nums transition-colors ${
+          !tracked
+            ? "border-neutral-300 text-mocha/60 hover:bg-neutral-200"
+            : item.stock === 0
+            ? "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+            : item.stock <= 3
+            ? "border-amber-600 text-amber-700 hover:bg-amber-600 hover:text-white"
+            : "border-ink text-ink hover:bg-ink hover:text-white"
+        }`}
+      >
+        {!tracked ? "Stock" : item.stock === 0 ? "Sold out" : `${item.stock} left`}
+      </button>
+    );
+  }
+  return (
+    <span className="inline-flex items-center">
+      <input
+        value={stock}
+        onChange={(e) => setStock(e.target.value.replace(/\D/g, ""))}
+        onKeyDown={(e) => e.key === "Enter" && save()}
+        inputMode="numeric"
+        placeholder="Qty"
+        title="Blank = don't track"
+        autoFocus
+        className="border border-ink border-r-0 px-2 py-1 text-sm w-16 focus:outline-none focus:border-brass"
+      />
+      <button
+        onClick={save}
+        title="Save stock"
+        className="text-xs bg-ink text-white font-black px-2.5 py-1.5 leading-none hover:bg-espresso-light transition-colors"
+      >
+        ✓
+      </button>
+      <button
+        onClick={() => setEditing(false)}
+        title="Cancel"
+        className="text-mocha/60 hover:text-red-600 text-lg leading-none px-1.5 transition-colors"
+      >
+        ×
+      </button>
+    </span>
   );
 }
 

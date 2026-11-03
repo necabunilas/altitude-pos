@@ -30,7 +30,11 @@ export async function getMenu({ onlyAvailable = false } = {}) {
     db.select().from(menuCategories).orderBy(asc(menuCategories.sortOrder)).all(),
     db.select().from(menuItems).orderBy(asc(menuItems.sortOrder)).all(),
   ]);
-  const items = allItems.filter((i) => (onlyAvailable ? i.available : true));
+  // Ordering views also drop food that has run out of stock; it comes back as
+  // soon as staff set a new count. The menu editor still lists everything.
+  const items = allItems.filter((i) =>
+    onlyAvailable ? i.available && (i.stock === null || i.stock > 0) : true
+  );
   const menu = cats.map((c) => ({
     ...c,
     items: items.filter((i) => i.categoryId === c.id),
@@ -67,6 +71,18 @@ export async function placeOrder({ tableId, cart, note = "", customerName = "" }
     .filter(Boolean);
 
   if (!lines.length) throw new Error("No valid items in cart");
+
+  // Food with a stock count is deducted now; put it back if saving fails.
+  await takeStock(lines, byId);
+  try {
+    return await saveOrderLines({ tableId, lines, note, cleanName });
+  } catch (e) {
+    await restoreStock(lines);
+    throw e;
+  }
+}
+
+async function saveOrderLines({ tableId, lines, note, cleanName }) {
 
   // One active order per table, enforced by a unique partial index
   // (orders_one_open_per_table). If the table already has an open (unpaid,
@@ -122,6 +138,48 @@ export async function placeOrder({ tableId, cart, note = "", customerName = "" }
   }
 }
 
+// ---- Stock ----
+// Items with a stock count (food) go down as soon as they're ordered. A null
+// stock means the item isn't tracked (drinks). Each deduction only succeeds if
+// enough is left, so two orders can't both take the last croissant.
+async function takeStock(lines, byId) {
+  const need = {};
+  for (const l of lines) {
+    if (byId[l.menuItemId]?.stock == null) continue;
+    need[l.menuItemId] = (need[l.menuItemId] || 0) + l.qty;
+  }
+  const taken = [];
+  for (const [id, qty] of Object.entries(need)) {
+    const row = await db
+      .update(menuItems)
+      .set({ stock: sql`${menuItems.stock} - ${qty}` })
+      .where(and(eq(menuItems.id, Number(id)), gte(menuItems.stock, qty)))
+      .returning()
+      .get();
+    if (!row) {
+      await restoreStock(taken);
+      const cur = await db.select().from(menuItems).where(eq(menuItems.id, Number(id))).get();
+      const left = Math.max(0, cur?.stock ?? 0);
+      throw new Error(
+        left ? `Only ${left} ${cur.name} left.` : `${cur?.name || "An item"} is sold out.`
+      );
+    }
+    taken.push({ menuItemId: Number(id), qty });
+  }
+}
+
+// Put stock back for removed lines (void, delete). Untracked items are skipped.
+async function restoreStock(items) {
+  for (const it of items) {
+    if (!it.menuItemId) continue;
+    await db
+      .update(menuItems)
+      .set({ stock: sql`${menuItems.stock} + ${it.qty}` })
+      .where(and(eq(menuItems.id, it.menuItemId), isNotNull(menuItems.stock)))
+      .run();
+  }
+}
+
 // Derived order status from its per-item statuses (cancelled stays cancelled).
 export function deriveOrderStatus(order) {
   if (order.status === "cancelled") return "cancelled";
@@ -168,6 +226,9 @@ export async function listOrders({ activeOnly = false } = {}) {
 export async function cancelOrder(id) {
   const order = await db.select().from(orders).where(eq(orders.id, id)).get();
   if (order?.paidAt) throw new Error("Can't cancel a paid order.");
+  if (order && order.status !== "cancelled") {
+    await restoreStock(await db.select().from(orderItems).where(eq(orderItems.orderId, id)).all());
+  }
   return db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, id)).returning().get();
 }
 
@@ -178,12 +239,16 @@ export async function cancelOrder(id) {
 export async function deleteOrder(id) {
   const order = await db.select().from(orders).where(eq(orders.id, id)).get();
   if (!order) return null;
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id)).all();
   await db.batch([
     db.update(feedback).set({ orderId: null }).where(eq(feedback.orderId, id)),
     db.delete(orderItems).where(eq(orderItems.orderId, id)),
     db.delete(orders).where(eq(orders.id, id)),
   ]);
   if (!order.closedAt) {
+    // Still open (rung up by mistake): the food goes back into stock. Closed
+    // orders were handed out, so their stock stays used.
+    if (order.status !== "cancelled") await restoreStock(items);
     await db
       .update(calls)
       .set({ status: "resolved" })
@@ -210,7 +275,9 @@ export async function voidItem(itemId) {
   if (!item) return null;
   const order = await db.select().from(orders).where(eq(orders.id, item.orderId)).get();
   if (order?.paidAt) throw new Error("Can't void an item on a paid order.");
-  return db.delete(orderItems).where(eq(orderItems.id, itemId)).returning().get();
+  const removed = await db.delete(orderItems).where(eq(orderItems.id, itemId)).returning().get();
+  if (removed) await restoreStock([removed]);
+  return removed;
 }
 
 // Unpaid, non-cancelled orders for one table, with items + totals. Used to
@@ -481,7 +548,14 @@ export async function placeCounterOrder({ label, cart, note = "", paymentMethod 
     .values({ slug, label: clean, active: false })
     .returning()
     .get();
-  const order = await placeOrder({ tableId: table.id, cart, note });
+  let order;
+  try {
+    order = await placeOrder({ tableId: table.id, cart, note });
+  } catch (e) {
+    // e.g. sold out: drop the unused hidden table so it doesn't pile up.
+    await db.delete(tables).where(eq(tables.id, table.id)).run();
+    throw e;
+  }
   // Counter/bar is pay-first: if a method is chosen, mark it paid right away.
   // The order still stays open on the board until it is served and closed.
   const method = ["cash", "card", "qr"].includes(paymentMethod) ? paymentMethod : null;
@@ -491,7 +565,13 @@ export async function placeCounterOrder({ label, cart, note = "", paymentMethod 
 
 // ---- Menu management (staff) ----
 
-export async function createMenuItem({ categoryId, name, description, priceCents, sortOrder, milkOption }) {
+// Stock from a form value: blank means not tracked, otherwise a whole number.
+function cleanStock(v) {
+  if (v === null || v === undefined || String(v).trim() === "") return null;
+  return Math.max(0, Math.round(Number(v) || 0));
+}
+
+export async function createMenuItem({ categoryId, name, description, priceCents, sortOrder, milkOption, stock }) {
   return db
     .insert(menuItems)
     .values({
@@ -501,6 +581,7 @@ export async function createMenuItem({ categoryId, name, description, priceCents
       priceCents: Math.max(0, Math.round(Number(priceCents) || 0)),
       sortOrder: Number(sortOrder) || 0,
       milkOption: !!milkOption,
+      stock: cleanStock(stock),
     })
     .returning()
     .get();
@@ -515,6 +596,7 @@ export async function updateMenuItem(id, patch) {
   if (patch.categoryId != null) fields.categoryId = Number(patch.categoryId);
   if (patch.sortOrder != null) fields.sortOrder = Number(patch.sortOrder);
   if (patch.milkOption != null) fields.milkOption = !!patch.milkOption;
+  if ("stock" in patch) fields.stock = cleanStock(patch.stock);
   if (!Object.keys(fields).length) return null;
   return db.update(menuItems).set(fields).where(eq(menuItems.id, id)).returning().get();
 }

@@ -59,7 +59,11 @@ export default async function PublicMenu() {
                   <div className="flex items-baseline justify-between gap-4">
                     <div className="font-bold text-ink leading-tight">{item.name}</div>
                     <div className="shrink-0 font-black text-brass-dark tabular-nums">
-                      {formatPeso(item.priceCents)}
+                      {item.stock !== null && item.stock <= 0 ? (
+                        <span className="text-xs uppercase tracking-wide text-mocha/50">Sold out</span>
+                      ) : (
+                        formatPeso(item.priceCents)
+                      )}
                     </div>
                   </div>
                   {item.description && (

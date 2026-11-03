@@ -18,6 +18,7 @@ export const MENU = [
       { name: "Matcha Latte", price: 140, description: "Matcha + steamed milk. For the matcha lovers out there. We see you." },
       { name: "Spanish Latte", price: 150, description: "Double shot espresso + steamed milk + condensed milk. Sweet, creamy and comforting." },
       { name: "Piccolo", price: 120, description: "Single shot espresso + steamed milk. Small, strong and smooth." },
+      { name: "Mocha", price: 160, description: "Double shot espresso + chocolate + steamed milk. Coffee and chocolate, served warm." },
     ],
   },
   {
@@ -65,7 +66,7 @@ const MILK_DRINKS = new Set([
   "Flat White", "Latte", "Cortado", "Dirty Matcha Latte", "Duet", "Hot Chocolate",
   "Matcha Latte", "Spanish Latte", "Piccolo", "Coco Brew", "Coco Matcha",
   "Iced Dirty Matcha Latte", "Iced Choco", "Iced Matcha Latte", "Mocha Brew",
-  "White Brew", "Iced Ube Latte",
+  "White Brew", "Iced Ube Latte", "Mocha",
 ]);
 
 export function menuRows(categoryIds) {

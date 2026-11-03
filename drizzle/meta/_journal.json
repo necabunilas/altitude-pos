@@ -71,6 +71,13 @@
       "when": 1793596937409,
       "tag": "0009_menu_item_milk_option",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793670183662,
+      "tag": "0010_menu_item_stock",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatPeso } from "@/lib/money";
 import { CARD_ENABLED } from "@/lib/flags";
 import MilkPicker from "@/app/MilkPicker";
@@ -13,6 +14,7 @@ const METHOD_LABEL = { cash: "Cash", card: "Card", qr: "QR" };
 // Staff-facing counter / bar order entry. Builds a cart from the menu and rings
 // it up as a standalone order (its own hidden table) that appears on the board.
 export default function CounterOrder({ menu }) {
+  const router = useRouter();
   const [cart, setCart] = useState({}); // { [cartKey]: qty }, key "id" or "id:milk"
   const [picking, setPicking] = useState(null); // milk drink awaiting dairy/oat choice
   const [name, setName] = useState("");
@@ -108,6 +110,7 @@ export default function CounterOrder({ menu }) {
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok) {
+        router.refresh(); // pick up the new stock counts
         setPlaced({
           orderId: d.orderId,
           label: d.label,
@@ -162,6 +165,10 @@ export default function CounterOrder({ menu }) {
           <div className="grid gap-2 sm:grid-cols-2">
             {cat.items.map((it) => {
               const qty = it.milkOption ? itemQty(it.id) : cart[it.id] || 0;
+              // Food with stock: show what's left and stop at it.
+              const tracked = it.stock !== null && it.stock !== undefined;
+              const soldOut = tracked && it.stock <= 0;
+              const atMax = tracked && qty >= it.stock;
               return (
                 <div
                   key={it.id}
@@ -171,9 +178,24 @@ export default function CounterOrder({ menu }) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{it.name}</div>
-                    <div className="text-sm text-mocha">{formatPeso(it.priceCents)}</div>
+                    <div className="text-sm text-mocha">
+                      {formatPeso(it.priceCents)}
+                      {tracked && (
+                        <span
+                          className={`ml-2 text-xs font-bold ${
+                            soldOut ? "text-red-600" : it.stock <= 3 ? "text-amber-700" : "text-mocha/60"
+                          }`}
+                        >
+                          {soldOut ? "Sold out" : `${it.stock} left`}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {it.milkOption ? (
+                  {soldOut && !qty ? (
+                    <span className="px-3 py-1.5 border border-sand text-mocha/50 text-xs font-black uppercase tracking-wide">
+                      Sold out
+                    </span>
+                  ) : it.milkOption ? (
                     // Milk drinks: each Add asks dairy or oat; remove in the order list.
                     <button
                       onClick={() => setPicking(it)}
@@ -192,7 +214,8 @@ export default function CounterOrder({ menu }) {
                       <span className="w-6 text-center font-semibold">{qty}</span>
                       <button
                         onClick={() => setQty(it.id, qty + 1)}
-                        className="w-8 h-8 rounded-full bg-espresso text-cream text-lg leading-none"
+                        disabled={atMax}
+                        className="w-8 h-8 rounded-full bg-espresso text-cream text-lg leading-none disabled:opacity-30"
                       >
                         +
                       </button>

@@ -38,6 +38,8 @@ export const menuItems = sqliteTable("menu_items", {
   sortOrder: integer("sort_order").notNull().default(0),
   // Milk drink: guests and staff pick dairy or oat milk when adding it.
   milkOption: integer("milk_option", { mode: "boolean" }).notNull().default(false),
+  // Pieces left (food). Goes down when ordered; null means not tracked.
+  stock: integer("stock"),
 });
 
 // status: placed -> preparing -> served -> closed | cancelled

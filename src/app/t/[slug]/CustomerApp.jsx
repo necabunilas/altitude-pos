@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatPeso, groupItems } from "@/lib/money";
 import { RESTAURANT_NAME, VAT_RATE } from "@/lib/brand";
 import { CARD_ENABLED, TERMINAL_ENABLED } from "@/lib/flags";
@@ -24,6 +25,7 @@ const ITEM_STATUS_STYLE = {
 };
 
 export default function CustomerApp({ slug, table, menu }) {
+  const router = useRouter();
   const [cart, setCart] = useState({}); // { [cartKey]: qty }, key "id" or "id:milk"
   const [picking, setPicking] = useState(null); // milk drink awaiting dairy/oat choice
   const [cartOpen, setCartOpen] = useState(false);
@@ -113,6 +115,9 @@ export default function CustomerApp({ slug, table, menu }) {
   const setQty = (key, qty) => setCart((c) => ({ ...c, [key]: Math.max(0, qty) }));
   // How many of an item are in the cart across milk choices.
   const itemQty = (id) => lines.filter((l) => l.item.id === id).reduce((s, l) => s + l.qty, 0);
+  // Food with a stock count can't be added past what's left.
+  const tracked = (item) => item.stock !== null && item.stock !== undefined;
+  const atMax = (item) => tracked(item) && itemQty(item.id) >= item.stock;
   function pickMilk(milk) {
     const key = cartKey(picking.id, milk);
     setCart((c) => ({ ...c, [key]: (c[key] || 0) + 1 }));
@@ -151,6 +156,7 @@ export default function CustomerApp({ slug, table, menu }) {
       if (res.ok) {
         setCart({});
         setCartOpen(false);
+        router.refresh(); // pick up the new stock counts
         show(order ? "Added to your order!" : "Order sent to the kitchen!");
         await loadMyOrders();
       } else {
@@ -374,9 +380,18 @@ export default function CustomerApp({ slug, table, menu }) {
                     )}
                     <div className="mt-2 font-black text-brass-dark tabular-nums">
                       {formatPeso(item.priceCents)}
+                      {tracked(item) && item.stock > 0 && item.stock <= 3 && (
+                        <span className="ml-2 text-xs font-bold text-amber-700">
+                          Only {item.stock} left
+                        </span>
+                      )}
                     </div>
                   </div>
-                  {item.milkOption ? (
+                  {tracked(item) && item.stock <= 0 && !cart[item.id] ? (
+                    <span className="shrink-0 h-9 px-4 grid place-items-center border border-sand text-mocha/50 text-xs font-black uppercase tracking-wide">
+                      Sold out
+                    </span>
+                  ) : item.milkOption ? (
                     // Milk drinks: each Add asks dairy or oat; adjust in the cart.
                     <div className="shrink-0 flex flex-col items-end gap-1">
                       <button
@@ -396,7 +411,7 @@ export default function CustomerApp({ slug, table, menu }) {
                     <Stepper
                       qty={cart[item.id] || 0}
                       onChange={(q) => setQty(item.id, q)}
-                      disabled={paid}
+                      disabled={paid || atMax(item)}
                     />
                   )}
                 </div>
@@ -439,7 +454,11 @@ export default function CustomerApp({ slug, table, menu }) {
                   <div className="font-medium">{l.name}</div>
                   <div className="text-sm text-mocha">{formatPeso(l.priceCents)}</div>
                 </div>
-                <Stepper qty={l.qty} onChange={(q) => setQty(l.key, q)} />
+                <Stepper
+                  qty={l.qty}
+                  onChange={(q) => setQty(l.key, q)}
+                  disabled={atMax(l.item)}
+                />
               </div>
             ))}
             {needsName && (
