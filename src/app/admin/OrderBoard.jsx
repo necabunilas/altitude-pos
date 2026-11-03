@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatPeso, methodLabel } from "@/lib/money";
 import { orderLabel } from "@/lib/orderLabel";
 import DeleteOrderModal from "./DeleteOrderModal";
-import ConfirmModal from "./ConfirmModal";
 import BillModal from "./BillModal";
+import EditOrderModal from "./EditOrderModal";
 import { ReceiptModal } from "./Receipt";
 
 const ORDER_COLOR = {
@@ -49,7 +49,8 @@ export default function OrderBoard() {
   const [closedSummary, setClosedSummary] = useState({ count: 0, revenueCents: 0 });
   const [showClosed, setShowClosed] = useState(false);
   const [deleting, setDeleting] = useState(null); // order awaiting delete confirmation
-  const [voiding, setVoiding] = useState(null); // { item, order } awaiting void confirmation
+  const [editingId, setEditingId] = useState(null); // order open in the editor
+  const editingOrder = orders.find((o) => o.id === editingId) || null;
   // Count of in-flight mutations. The background poll stands down while > 0 so
   // it can't revert an optimistic update with stale data mid-request.
   const mutating = useRef(0);
@@ -119,16 +120,6 @@ export default function OrderBoard() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
         })
-    );
-  }
-
-  function voidItem(itemId) {
-    return mutate(
-      (o) => {
-        const next = o.items.filter((it) => it.id !== itemId);
-        return next.length === o.items.length ? o.items : next;
-      },
-      () => fetch(`/api/order-items/${itemId}`, { method: "DELETE" })
     );
   }
 
@@ -247,15 +238,6 @@ export default function OrderBoard() {
                         Prepare
                       </button>
                     )}
-                    {!paid && (
-                      <button
-                        onClick={() => setVoiding({ item: it, order })}
-                        title="Void item"
-                        className="text-mocha/40 hover:text-red-600 leading-none text-lg"
-                      >
-                        ×
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -267,12 +249,18 @@ export default function OrderBoard() {
               )}
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-sand/60">
                 <span className="font-semibold">{formatPeso(order.totalCents)}</span>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-3 items-center">
                   <button
                     onClick={() => remove(order)}
                     className="text-sm text-mocha/70 hover:text-red-600"
                   >
                     Delete
+                  </button>
+                  <button
+                    onClick={() => setEditingId(order.id)}
+                    className="text-sm text-mocha/70 hover:text-espresso"
+                  >
+                    Edit
                   </button>
                   <button
                     onClick={() => setBillTableId(order.tableId)}
@@ -343,24 +331,6 @@ export default function OrderBoard() {
         </div>
       )}
 
-      {voiding && (
-        <ConfirmModal
-          title="Void item?"
-          confirmLabel="Void"
-          busyLabel="Voiding…"
-          onConfirm={() => voidItem(voiding.item.id)}
-          onClose={() => setVoiding(null)}
-        >
-          <div className="mt-1 text-mocha">
-            {voiding.item.qty}× {voiding.item.name}
-          </div>
-          <p className="text-xs text-mocha/70 mt-1">
-            Order #{voiding.order.id} · {orderLabel(voiding.order)}
-          </p>
-          <p className="text-sm text-mocha mt-4">It will be removed from this order.</p>
-        </ConfirmModal>
-      )}
-
       {deleting && (
         <DeleteOrderModal
           order={deleting}
@@ -371,6 +341,14 @@ export default function OrderBoard() {
 
       {viewOrder && (
         <ReceiptModal order={viewOrder} onClose={() => setViewOrder(null)} />
+      )}
+
+      {editingOrder && (
+        <EditOrderModal
+          order={editingOrder}
+          onChanged={() => refresh(true)}
+          onClose={() => setEditingId(null)}
+        />
       )}
 
       {billTableId && billTable && (

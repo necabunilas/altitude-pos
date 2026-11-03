@@ -271,6 +271,75 @@ export async function voidItem(itemId) {
   return removed;
 }
 
+// ---- Staff order editing (Edit on an active order) ----
+// Works on any order still on the board, paid or not, so counter orders rung
+// up wrong can be fixed. Stock follows every change.
+async function editableOrder(orderId) {
+  const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
+  if (!order) return null;
+  if (order.closedAt || order.status === "cancelled") {
+    throw new Error("This order is closed and can't be edited.");
+  }
+  return order;
+}
+
+const cleanQty = (q) => Math.max(1, Math.min(50, Math.round(Number(q) || 1)));
+
+export async function addOrderItem(orderId, { menuItemId, qty, milk }) {
+  if (!(await editableOrder(orderId))) return null;
+  const item = await db.select().from(menuItems).where(eq(menuItems.id, Number(menuItemId))).get();
+  if (!item) throw new Error("Item not found.");
+  const m = item.milkOption && milk === "oat" ? "oat" : null;
+  const line = {
+    menuItemId: item.id,
+    name: milkLineName(item.name, m),
+    priceCents: item.priceCents + milkExtra(m),
+    qty: cleanQty(qty),
+    note: "",
+  };
+  await takeStock([line], { [item.id]: item });
+  try {
+    return await db
+      .insert(orderItems)
+      .values({ ...line, orderId, status: "placed" })
+      .returning()
+      .get();
+  } catch (e) {
+    await restoreStock([line]);
+    throw e;
+  }
+}
+
+export async function setOrderItemQty(itemId, qty) {
+  const line = await db.select().from(orderItems).where(eq(orderItems.id, itemId)).get();
+  if (!line) return null;
+  await editableOrder(line.orderId);
+  const q = cleanQty(qty);
+  const delta = q - line.qty;
+  if (delta > 0 && line.menuItemId) {
+    const item = await db.select().from(menuItems).where(eq(menuItems.id, line.menuItemId)).get();
+    await takeStock([{ menuItemId: line.menuItemId, qty: delta }], item ? { [item.id]: item } : {});
+  } else if (delta < 0) {
+    await restoreStock([{ menuItemId: line.menuItemId, qty: -delta }]);
+  }
+  return db.update(orderItems).set({ qty: q }).where(eq(orderItems.id, itemId)).returning().get();
+}
+
+export async function removeOrderItem(itemId) {
+  const line = await db.select().from(orderItems).where(eq(orderItems.id, itemId)).get();
+  if (!line) return null;
+  await editableOrder(line.orderId);
+  const others = await db
+    .select()
+    .from(orderItems)
+    .where(and(eq(orderItems.orderId, line.orderId), ne(orderItems.id, itemId)))
+    .all();
+  if (!others.length) throw new Error("That's the last item. Delete the order instead.");
+  await db.delete(orderItems).where(eq(orderItems.id, itemId)).run();
+  await restoreStock([line]);
+  return line;
+}
+
 // Unpaid, non-cancelled orders for one table, with items + totals. Used to
 // build the bill when a table is settled.
 export async function getTableOpenOrders(tableId) {

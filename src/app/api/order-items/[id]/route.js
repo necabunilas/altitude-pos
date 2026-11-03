@@ -1,7 +1,8 @@
-import { setItemStatus, voidItem } from "@/lib/data";
+import { setItemStatus, voidItem, setOrderItemQty, removeOrderItem } from "@/lib/data";
 import { isStaffAuthed } from "@/lib/auth";
 
-// Advance a single line item's status (preparing / served).
+// Advance a single line item's status (preparing / served), or change its
+// quantity from the Edit order screen ({ qty }).
 export async function PATCH(request, { params }) {
   if (!(await isStaffAuthed())) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -9,7 +10,10 @@ export async function PATCH(request, { params }) {
   const { id } = await params;
   const body = await request.json().catch(() => null);
   try {
-    const item = await setItemStatus(Number(id), body?.status);
+    const item =
+      body?.qty != null
+        ? await setOrderItemQty(Number(id), body.qty)
+        : await setItemStatus(Number(id), body?.status);
     if (!item) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json({ ok: true, item });
   } catch (e) {
@@ -17,14 +21,16 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// Staff void: remove the line.
+// Staff void: remove the line. From the Edit order screen (?edit=1) it also
+// works on paid orders, as long as the order is still open.
 export async function DELETE(request, { params }) {
   if (!(await isStaffAuthed())) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
+  const edit = new URL(request.url).searchParams.get("edit") === "1";
   try {
-    const item = await voidItem(Number(id));
+    const item = edit ? await removeOrderItem(Number(id)) : await voidItem(Number(id));
     if (!item) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json({ ok: true });
   } catch (e) {
