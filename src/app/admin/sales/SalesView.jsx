@@ -278,17 +278,28 @@ export default function SalesView() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white border border-ink p-4">
+      {/* Stacked on phones so a 5+ digit revenue has room; side by side from sm. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="bg-white border border-ink p-4 min-w-0">
           <div className="text-xs uppercase tracking-[0.15em] text-brass-dark">Revenue</div>
-          <div className="font-display text-3xl text-espresso mt-1">
+          <div className="font-display text-3xl text-espresso mt-1 tabular-nums break-words">
             {formatPeso(summary.revenueCents)}
           </div>
-          <div className="text-xs text-mocha mt-1.5">
-            💵 Cash {formatPeso(summary.cashCents || 0)} · 💳 Card{" "}
-            {formatPeso(summary.cardCents || 0)} · 📱 QR{" "}
-            {formatPeso(summary.qrCents || 0)}
-            {summary.otherCents ? ` · Other ${formatPeso(summary.otherCents)}` : ""}
+          {/* One tender per line; card only shows when it was used. */}
+          <div className="text-xs text-mocha mt-2 space-y-0.5">
+            {[
+              ["💵 Cash", summary.cashCents || 0, true],
+              ["📱 QR", summary.qrCents || 0, true],
+              ["💳 Card", summary.cardCents || 0, !!summary.cardCents],
+              ["Other", summary.otherCents || 0, !!summary.otherCents],
+            ]
+              .filter(([, , show]) => show)
+              .map(([label, cents]) => (
+                <div key={label} className="flex justify-between gap-3">
+                  <span>{label}</span>
+                  <span className="tabular-nums">{formatPeso(cents)}</span>
+                </div>
+              ))}
           </div>
         </div>
         <div className="bg-white border border-ink p-4">
