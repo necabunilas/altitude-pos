@@ -9,7 +9,7 @@ export const RESTAURANT_DESCRIPTION =
 
 export const SOCIAL = {
   facebook: "https://www.facebook.com/altitudecoffeeph",
-  instagram: "https://www.instagram.com/altitude.ph/",
+  instagram: "https://www.instagram.com/altitude.cc/",
 };
 
 // Developer credit shown in the footer (per the development agreement).
