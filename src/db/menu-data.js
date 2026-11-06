@@ -30,7 +30,7 @@ export const MENU = [
       { name: "Iced Choco", price: 160, description: "Chocolate + condensed milk + milk." },
       { name: "Iced Matcha Latte", price: 170, description: "Matcha + milk + condensed milk. For our matcha lovers out there. We see you." },
       { name: "Mocha Brew", price: 180, description: "Espresso + chocolate + milk + condensed milk. Coffee and chocolate together, what's not to love?" },
-      { name: "White Brew", price: 170, description: "Espresso + milk + condensed milk. This is basically a spanish latte, but cold. Everyone's favorite!" },
+      { name: "Iced Spanish Latte", price: 170, description: "Espresso + milk + condensed milk, over ice. Sweet, creamy and everyone's favorite!" },
       { name: "Iced Ube Latte", price: 160, description: "Ube + milk + condensed milk, over ice. Sweet, creamy and very purple." },
       { name: "Iced Americano", price: 120, description: "Double shot espresso + water, over ice. Clean, bold and refreshing." },
     ],
@@ -66,7 +66,7 @@ const MILK_DRINKS = new Set([
   "Flat White", "Latte", "Cortado", "Dirty Matcha Latte", "Duet", "Hot Chocolate",
   "Matcha Latte", "Spanish Latte", "Piccolo", "Coco Brew", "Coco Matcha",
   "Iced Dirty Matcha Latte", "Iced Choco", "Iced Matcha Latte", "Mocha Brew",
-  "White Brew", "Iced Ube Latte", "Mocha",
+  "Iced Spanish Latte", "Iced Ube Latte", "Mocha",
 ]);
 
 export function menuRows(categoryIds) {
