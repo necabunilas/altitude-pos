@@ -1,7 +1,8 @@
-import { cancelOrder, deleteOrder } from "@/lib/data";
+import { cancelOrder, deleteOrder, updateOrderDetails } from "@/lib/data";
 import { isStaffAuthed } from "@/lib/auth";
 
-// Order-level actions: cancel the whole order.
+// Order-level actions: cancel the whole order, or edit its name / payment
+// type from the Edit order screen.
 export async function PATCH(request, { params }) {
   if (!(await isStaffAuthed())) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -11,6 +12,14 @@ export async function PATCH(request, { params }) {
   try {
     if (body?.action === "cancel" || body?.status === "cancelled") {
       const order = await cancelOrder(Number(id));
+      if (!order) return Response.json({ error: "Not found" }, { status: 404 });
+      return Response.json({ ok: true, order });
+    }
+    if (body?.action === "details") {
+      const order = await updateOrderDetails(Number(id), {
+        name: body.name,
+        paymentMethod: body.paymentMethod,
+      });
       if (!order) return Response.json({ error: "Not found" }, { status: 404 });
       return Response.json({ ok: true, order });
     }

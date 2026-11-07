@@ -51,6 +51,11 @@ export default function OrderBoard() {
   const [deleting, setDeleting] = useState(null); // order awaiting delete confirmation
   const [editingId, setEditingId] = useState(null); // order open in the editor
   const editingOrder = orders.find((o) => o.id === editingId) || null;
+  const [toast, setToast] = useState(null); // short confirmation, e.g. after an edit
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  }
   // Count of in-flight mutations. The background poll stands down while > 0 so
   // it can't revert an optimistic update with stale data mid-request.
   const mutating = useRef(0);
@@ -347,8 +352,17 @@ export default function OrderBoard() {
         <EditOrderModal
           order={editingOrder}
           onChanged={() => refresh(true)}
-          onClose={() => setEditingId(null)}
+          onClose={(edited) => {
+            if (edited) showToast(`Order #${editingOrder.id} updated`);
+            setEditingId(null);
+          }}
         />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 inset-x-4 z-50 mx-auto max-w-sm text-center text-sm font-bold px-4 py-3 bg-emerald-700 text-white shadow-lg">
+          ✓ {toast}
+        </div>
       )}
 
       {billTableId && billTable && (

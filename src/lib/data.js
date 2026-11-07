@@ -325,6 +325,43 @@ export async function setOrderItemQty(itemId, qty) {
   return db.update(orderItems).set({ qty: q }).where(eq(orderItems.id, itemId)).returning().get();
 }
 
+// Name and payment from the Edit order screen. A counter order's name lives on
+// its hidden table's label; a table (QR) order keeps it in customerName.
+// Picking a method marks the order paid (or switches the method if already
+// paid); "unpaid" clears the payment so it can be billed again.
+export async function updateOrderDetails(orderId, { name, paymentMethod } = {}) {
+  const order = await editableOrder(orderId);
+  if (!order) return null;
+  if (name !== undefined) {
+    const clean = String(name || "").trim().slice(0, 40);
+    if (!clean) throw new Error("Enter a name.");
+    const table = await db.select().from(tables).where(eq(tables.id, order.tableId)).get();
+    if (table?.slug.startsWith("counter-")) {
+      await db.update(tables).set({ label: clean }).where(eq(tables.id, table.id)).run();
+    } else {
+      await db.update(orders).set({ customerName: clean }).where(eq(orders.id, orderId)).run();
+    }
+  }
+  if (paymentMethod !== undefined) {
+    if (paymentMethod === "unpaid") {
+      await db
+        .update(orders)
+        .set({ paidAt: null, paymentMethod: null, paymentProvider: null, paymentRef: null })
+        .where(eq(orders.id, orderId))
+        .run();
+    } else if (["cash", "qr", "card"].includes(paymentMethod)) {
+      await db
+        .update(orders)
+        .set({ paidAt: order.paidAt || new Date(), paymentMethod })
+        .where(eq(orders.id, orderId))
+        .run();
+    } else {
+      throw new Error("Unknown payment type.");
+    }
+  }
+  return db.select().from(orders).where(eq(orders.id, orderId)).get();
+}
+
 export async function removeOrderItem(itemId) {
   const line = await db.select().from(orderItems).where(eq(orderItems.id, itemId)).get();
   if (!line) return null;

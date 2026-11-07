@@ -4,19 +4,28 @@ import { useEffect, useState } from "react";
 import { formatPeso } from "@/lib/money";
 import { orderLabel } from "@/lib/orderLabel";
 import MilkPicker from "@/app/MilkPicker";
+import { CARD_ENABLED } from "@/lib/flags";
 
-// Staff fix-ups on an active order: change quantities, remove lines and add
-// items from the menu. Every change saves right away (stock follows) and the
+// Staff fix-ups on an active order: name, payment type, quantities, removing
+// lines and adding items from the menu. Every change saves right away (stock follows) and the
 // board refreshes behind it. Paid orders can be edited too; the footer shows
 // how much to collect or refund.
-export default function EditOrderModal({ order, onChanged, onClose }) {
+export default function EditOrderModal({ order, onChanged, onClose: close }) {
   const [menu, setMenu] = useState([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false); // brief "Saved" after each change
+  const [edited, setEdited] = useState(false); // any change made, for the board's toast
   const [picking, setPicking] = useState(null); // milk drink awaiting dairy/oat
   // Total when the editor opened, to show the difference on paid orders.
   const [startTotal] = useState(order.totalCents);
+  const [wasPaid] = useState(!!order.paidAt);
+  // Counter orders keep the name on their hidden table; QR orders on the order.
+  const isCounter = !!order.table?.slug?.startsWith("counter-");
+  const savedName = (isCounter ? order.table?.label : order.customerName) || "";
+  const [name, setName] = useState(savedName);
+  const method = order.paidAt ? order.paymentMethod || "cash" : "unpaid";
 
   useEffect(() => {
     fetch("/api/menu")
@@ -34,6 +43,10 @@ export default function EditOrderModal({ order, onChanged, onClose }) {
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setError(d.error || "Could not save the change.");
+      } else {
+        setEdited(true);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
       }
       await onChanged();
       // Stock counts may have moved; reload the add list.
@@ -53,8 +66,39 @@ export default function EditOrderModal({ order, onChanged, onClose }) {
     run(() => fetch(`/api/order-items/${it.id}`, json("PATCH", { qty })));
   const remove = (it) =>
     run(() => fetch(`/api/order-items/${it.id}?edit=1`, { method: "DELETE" }));
+  const setMethod = (paymentMethod) =>
+    paymentMethod !== method &&
+    run(() => fetch(`/api/orders/${order.id}`, json("PATCH", { action: "details", paymentMethod })));
   const add = (menuItemId, milk = null) =>
     run(() => fetch(`/api/orders/${order.id}/items`, json("POST", { menuItemId, qty: 1, milk })));
+
+  // Tell the board whether anything changed so it can confirm the edit.
+  const onClose = () => close(edited);
+
+  // Done saves a changed name, then closes. Other changes already saved.
+  async function done() {
+    if (busy) return;
+    const changed = name.trim() !== savedName;
+    if (!changed) return onClose();
+    if (!name.trim()) {
+      setError("Enter a name.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, json("PATCH", { action: "details", name }));
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || "Could not save the name.");
+        return;
+      }
+      await onChanged();
+      close(true);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const q = query.trim().toLowerCase();
   const results = menu
@@ -78,6 +122,45 @@ export default function EditOrderModal({ order, onChanged, onClose }) {
         </div>
 
         <div className="overflow-y-auto p-4 space-y-5">
+          {/* Name + payment type */}
+          <div className="space-y-2">
+            <div className="text-xs uppercase tracking-[0.15em] text-brass-dark">Details</div>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 40))}
+              placeholder="Customer name"
+              className="w-full border border-ink px-3 py-2 text-sm bg-white focus:outline-none focus:border-brass"
+            />
+            <div className="flex gap-2">
+              {[
+                ["unpaid", "Unpaid"],
+                ["cash", "💵 Cash"],
+                ["qr", "📱 QR"],
+                ["card", "💳 Card"],
+              ]
+                .filter(([v]) => v !== "card" || CARD_ENABLED || method === "card")
+                .map(([v, l]) => (
+                  <button
+                    key={v}
+                    onClick={() => setMethod(v)}
+                    disabled={busy}
+                    className={`flex-1 py-2 text-xs font-black uppercase tracking-wide border disabled:opacity-60 ${
+                      method === v
+                        ? v === "unpaid"
+                          ? "bg-amber-100 text-amber-800 border-amber-600"
+                          : "bg-ink text-white border-ink"
+                        : "bg-white border-ink text-ink"
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+            </div>
+            <p className="text-[11px] text-mocha/60">
+              Picking Cash or QR marks it paid. Unpaid sends it back to be billed.
+            </p>
+          </div>
+
           {/* Current lines */}
           <div>
             <div className="text-xs uppercase tracking-[0.15em] text-brass-dark mb-2">Items</div>
@@ -167,7 +250,12 @@ export default function EditOrderModal({ order, onChanged, onClose }) {
           {error && (
             <p className="text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2">{error}</p>
           )}
-          {paid && diff !== 0 && (
+          {saved && !error && (
+            <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2">
+              ✓ Saved
+            </p>
+          )}
+          {wasPaid && paid && diff !== 0 && (
             <p className="text-sm bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2">
               Already paid.{" "}
               {diff > 0
@@ -180,10 +268,11 @@ export default function EditOrderModal({ order, onChanged, onClose }) {
             <span className="font-black text-xl tabular-nums">{formatPeso(order.totalCents)}</span>
           </div>
           <button
-            onClick={onClose}
-            className="w-full py-3 bg-ink text-white font-black uppercase tracking-wide text-sm hover:bg-espresso-light transition-colors"
+            onClick={done}
+            disabled={busy}
+            className="w-full py-3 bg-ink text-white font-black uppercase tracking-wide text-sm hover:bg-espresso-light transition-colors disabled:opacity-60"
           >
-            Done
+            {busy ? "Saving…" : "Done"}
           </button>
         </div>
       </div>
