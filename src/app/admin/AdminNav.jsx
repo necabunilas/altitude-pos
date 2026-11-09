@@ -37,6 +37,19 @@ export default function AdminNav() {
   // Close the mobile menu whenever the route changes.
   useEffect(() => setMenuOpen(false), [pathname]);
 
+  // Escape goes back to the home banner, same as the name link. Skipped while
+  // a modal is open (they all use a fixed inset-0 overlay) or the menu is open.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== "Escape" || e.repeat) return;
+      if (menuOpen) return setMenuOpen(false);
+      if (document.querySelector(".fixed.inset-0")) return;
+      router.push("/");
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen, router]);
+
   async function logout() {
     await fetch("/api/auth", { method: "DELETE" });
     router.replace("/admin/login");

@@ -16,5 +16,14 @@ export default function BannerAlerts() {
     if (justArrived || orderArrived) router.push("/admin");
   }, [justArrived, orderArrived, router]);
 
+  // Enter on the banner opens the counter, same as tapping anywhere.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Enter" && !e.repeat) router.push("/admin/order");
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router]);
+
   return null;
 }
