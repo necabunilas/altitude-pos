@@ -19,7 +19,7 @@ export async function GET(request) {
 
   const { sales, summary } = await listSales({ from, to, limit: 100000, offset: 0 });
 
-  const header = ["Order #", "Table", "Name", "Closed", "Items", "Total", "Payment", "Ref"];
+  const header = ["Order #", "Table", "Name", "Closed", "Items", "Subtotal", "Discount", "Discount type", "ID no.", "Total", "Payment", "Ref"];
   const lines = [header.join(",")];
   for (const o of sales) {
     lines.push(
@@ -29,6 +29,10 @@ export async function GET(request) {
         o.customerName || "",
         o.closedAt ? new Date(o.closedAt).toLocaleString("en-PH") : "",
         o.items.reduce((s, i) => s + i.qty, 0),
+        (o.subtotalCents / 100).toFixed(2),
+        ((o.discountCents || 0) / 100).toFixed(2),
+        o.discountType || "",
+        o.discountIdNo || "",
         (o.totalCents / 100).toFixed(2),
         o.paymentMethod || "",
         o.paymentRef || "",
@@ -52,6 +56,9 @@ export async function GET(request) {
     }
     lines.push(["Drinks total", "", "", ((summary.drinkCents || 0) / 100).toFixed(2)].map(csvCell).join(","));
     lines.push(["Food total", "", "", ((summary.foodCents || 0) / 100).toFixed(2)].map(csvCell).join(","));
+    if (summary.discountCents) {
+      lines.push(["Senior/PWD discounts", "", summary.discountCount, (-summary.discountCents / 100).toFixed(2)].map(csvCell).join(","));
+    }
   }
 
   const csv = lines.join("\n");

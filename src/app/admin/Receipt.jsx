@@ -2,6 +2,7 @@
 
 import { formatPeso, groupItems } from "@/lib/money";
 import { RECEIPT_BUSINESS, VAT_RATE } from "@/lib/brand";
+import { discountLabel } from "@/lib/discount";
 
 // A single-order receipt, styled like a thermal-printer slip. Wrap in
 // ReceiptModal to view/print, or render inline.
@@ -16,7 +17,9 @@ function fmtDateTime(ts) {
 }
 
 export default function Receipt({ order, printable = true }) {
-  const total = order.totalCents ?? order.items.reduce((s, i) => s + i.priceCents * i.qty, 0);
+  const subtotal = order.items.reduce((s, i) => s + i.priceCents * i.qty, 0);
+  const discount = order.discountCents || 0;
+  const total = order.totalCents ?? subtotal - discount;
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
   const paid = !!order.paidAt;
   const method = order.paymentMethod;
@@ -74,7 +77,20 @@ export default function Receipt({ order, printable = true }) {
 
       <Rule />
 
-      <Row label={`Subtotal (${itemCount} item${itemCount === 1 ? "" : "s"})`} value={formatPeso(total)} />
+      <Row label={`Subtotal (${itemCount} item${itemCount === 1 ? "" : "s"})`} value={formatPeso(subtotal)} />
+      {discount > 0 && (
+        <>
+          <Row
+            label={`${discountLabel(order.discountType)} disc. 20%${
+              order.discountParty > 1 ? ` (${order.discountCount}/${order.discountParty})` : ""
+            }`}
+            value={`-${formatPeso(discount)}`}
+          />
+          {order.discountIdNo ? (
+            <div className="text-[10px] text-neutral-500 pl-3">ID No. {order.discountIdNo}</div>
+          ) : null}
+        </>
+      )}
       <div className="flex justify-between font-bold text-sm mt-0.5">
         <span>TOTAL</span>
         <span>{formatPeso(total)}</span>

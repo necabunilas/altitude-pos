@@ -300,6 +300,12 @@ export default function SalesView() {
                   <span className="tabular-nums">{formatPeso(cents)}</span>
                 </div>
               ))}
+            {summary.discountCents > 0 && (
+              <div className="flex justify-between gap-3 text-brass-dark pt-0.5">
+                <span>Senior/PWD discounts ({summary.discountCount})</span>
+                <span className="tabular-nums">−{formatPeso(summary.discountCents)}</span>
+              </div>
+            )}
           </div>
         </div>
         <div className="bg-white border border-ink p-4">
@@ -331,6 +337,14 @@ export default function SalesView() {
             />
           </div>
         </div>
+      )}
+
+      {(summary.byHour?.length || 0) > 0 && (
+        <BusiestTimes
+          byHour={summary.byHour}
+          byWeekday={summary.byWeekday || []}
+          openDays={summary.openDays || 1}
+        />
       )}
 
       {!loading && sales.length === 0 && (
@@ -443,6 +457,83 @@ function BreakdownGroup({ title, accent, total, rows }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function hourLabel(h) {
+  const h12 = h % 12 || 12;
+  return `${h12}${h < 12 ? "am" : "pm"}`;
+}
+
+// When the café is busiest over the range: sales by hour of day (from when
+// orders were placed) and, for ranges longer than a day, by weekday. Over
+// several days the figures are averages per open day so weeks compare fairly.
+function BusiestTimes({ byHour, byWeekday, openDays }) {
+  const multi = openDays > 1;
+  // Fill the gaps between the first and last busy hour so quiet hours show.
+  const first = byHour[0].hour;
+  const last = byHour[byHour.length - 1].hour;
+  const at = Object.fromEntries(byHour.map((h) => [h.hour, h]));
+  const hours = [];
+  for (let h = first; h <= last; h++) hours.push(at[h] || { hour: h, orders: 0, revenueCents: 0 });
+  const hourRows = hours.map((h) => ({
+    key: h.hour,
+    label: hourLabel(h.hour),
+    cents: Math.round(h.revenueCents / openDays),
+    orders: h.orders / openDays,
+  }));
+  const dayRows = byWeekday.map((d) => ({
+    key: d.dow,
+    label: WEEKDAYS[d.dow],
+    cents: Math.round(d.revenueCents / d.days),
+    orders: d.orders / d.days,
+    note: `${d.days} day${d.days === 1 ? "" : "s"}`,
+  }));
+
+  return (
+    <div className="bg-white border border-ink">
+      <div className="px-4 py-3 border-b border-sand">
+        <h2 className="font-display text-xl text-espresso">Busiest times</h2>
+        <p className="text-xs text-mocha/70 mt-0.5">
+          {multi
+            ? `Average per open day over ${openDays} days, by when orders were placed.`
+            : "By when orders were placed."}
+        </p>
+      </div>
+      <div className={`grid divide-y divide-sand ${multi ? "sm:grid-cols-2 sm:divide-y-0 sm:divide-x" : ""}`}>
+        <BarList title="By hour" rows={hourRows} />
+        {multi && dayRows.length > 0 && <BarList title="By weekday" rows={dayRows} />}
+      </div>
+    </div>
+  );
+}
+
+function BarList({ title, rows }) {
+  const max = Math.max(1, ...rows.map((r) => r.cents));
+  const top = rows.reduce((a, r) => (r.cents > a.cents ? r : a), rows[0]);
+  const fmtOrders = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  return (
+    <div className="p-4">
+      <div className="font-black uppercase tracking-wide text-sm mb-2.5">{title}</div>
+      <ul className="space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.key} className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 text-sm">
+            <span className={r === top && r.cents > 0 ? "font-black" : "text-mocha"}>{r.label}</span>
+            <div className="h-4 bg-sand/40">
+              <div
+                className={`h-full ${r === top && r.cents > 0 ? "bg-brass" : "bg-mocha/60"}`}
+                style={{ width: `${(r.cents / max) * 100}%` }}
+              />
+            </div>
+            <span className="tabular-nums text-right whitespace-nowrap">
+              {formatPeso(r.cents)}
+              <span className="text-mocha/60 text-xs"> · {fmtOrders(r.orders)} orders</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

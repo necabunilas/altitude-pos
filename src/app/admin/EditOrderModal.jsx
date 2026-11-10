@@ -5,6 +5,8 @@ import { formatPeso } from "@/lib/money";
 import { orderLabel } from "@/lib/orderLabel";
 import MilkPicker from "@/app/MilkPicker";
 import { CARD_ENABLED } from "@/lib/flags";
+import { discountLabel } from "@/lib/discount";
+import DiscountFields from "./DiscountFields";
 
 // Staff fix-ups on an active order: name, payment type, quantities, removing
 // lines and adding items from the menu. Every change saves right away (stock follows) and the
@@ -26,6 +28,12 @@ export default function EditOrderModal({ order, onChanged, onClose: close }) {
   const savedName = (isCounter ? order.table?.label : order.customerName) || "";
   const [name, setName] = useState(savedName);
   const method = order.paidAt ? order.paymentMethod || "cash" : "unpaid";
+  const [discount, setDiscount] = useState({
+    type: order.discountType || null,
+    count: order.discountCount || 1,
+    party: order.discountParty || 1,
+    idNo: order.discountIdNo || "",
+  });
 
   useEffect(() => {
     fetch("/api/menu")
@@ -69,17 +77,26 @@ export default function EditOrderModal({ order, onChanged, onClose: close }) {
   const setMethod = (paymentMethod) =>
     paymentMethod !== method &&
     run(() => fetch(`/api/orders/${order.id}`, json("PATCH", { action: "details", paymentMethod })));
+  // Discount type and head count save right away; the ID number saves on Done.
+  function changeDiscount(next) {
+    const moved =
+      next.type !== discount.type || next.count !== discount.count || next.party !== discount.party;
+    setDiscount(next);
+    if (moved) run(() => fetch(`/api/orders/${order.id}`, json("PATCH", { action: "discount", ...next })));
+  }
   const add = (menuItemId, milk = null) =>
     run(() => fetch(`/api/orders/${order.id}/items`, json("POST", { menuItemId, qty: 1, milk })));
 
   // Tell the board whether anything changed so it can confirm the edit.
   const onClose = () => close(edited);
 
-  // Done saves a changed name, then closes. Other changes already saved.
+  // Done saves a changed name and discount ID, then closes. Other changes
+  // already saved.
   async function done() {
     if (busy) return;
-    const changed = name.trim() !== savedName;
-    if (!changed) return onClose();
+    const nameChanged = name.trim() !== savedName;
+    const idChanged = !!discount.type && discount.idNo.trim() !== (order.discountIdNo || "");
+    if (!nameChanged && !idChanged) return onClose();
     if (!name.trim()) {
       setError("Enter a name.");
       return;
@@ -87,11 +104,16 @@ export default function EditOrderModal({ order, onChanged, onClose: close }) {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(`/api/orders/${order.id}`, json("PATCH", { action: "details", name }));
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        setError(d.error || "Could not save the name.");
-        return;
+      const saves = [
+        nameChanged && fetch(`/api/orders/${order.id}`, json("PATCH", { action: "details", name })),
+        idChanged && fetch(`/api/orders/${order.id}`, json("PATCH", { action: "discount", ...discount })),
+      ].filter(Boolean);
+      for (const res of await Promise.all(saves)) {
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setError(d.error || "Could not save the change.");
+          return;
+        }
       }
       await onChanged();
       close(true);
@@ -159,6 +181,12 @@ export default function EditOrderModal({ order, onChanged, onClose: close }) {
             <p className="text-[11px] text-mocha/60">
               Picking Cash or QR marks it paid. Unpaid sends it back to be billed.
             </p>
+          </div>
+
+          {/* Senior / PWD discount */}
+          <div className="space-y-2">
+            <div className="text-xs uppercase tracking-[0.15em] text-brass-dark">Discount</div>
+            <DiscountFields value={discount} onChange={changeDiscount} disabled={busy} />
           </div>
 
           {/* Current lines */}
@@ -262,6 +290,18 @@ export default function EditOrderModal({ order, onChanged, onClose: close }) {
                 ? `Collect ${formatPeso(diff)} more from the customer.`
                 : `Give back ${formatPeso(-diff)} to the customer.`}
             </p>
+          )}
+          {order.discountCents > 0 && (
+            <div className="text-sm space-y-0.5">
+              <div className="flex justify-between text-mocha">
+                <span>Subtotal</span>
+                <span className="tabular-nums">{formatPeso(order.subtotalCents)}</span>
+              </div>
+              <div className="flex justify-between text-brass-dark">
+                <span>{discountLabel(order.discountType)} 20%</span>
+                <span className="tabular-nums">−{formatPeso(order.discountCents)}</span>
+              </div>
+            </div>
           )}
           <div className="flex items-center justify-between">
             <span className="text-mocha">Total</span>

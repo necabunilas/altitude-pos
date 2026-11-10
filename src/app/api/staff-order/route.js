@@ -16,6 +16,7 @@ export async function POST(request) {
       cart: body.cart,
       note: body.note,
       paymentMethod: body.paymentMethod,
+      discount: body.discount || null,
     });
     return Response.json({ ok: true, ...res }, { status: 201 });
   } catch (e) {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatPeso, methodLabel } from "@/lib/money";
 import { orderLabel } from "@/lib/orderLabel";
+import { discountLabel } from "@/lib/discount";
 import DeleteOrderModal from "./DeleteOrderModal";
 import BillModal from "./BillModal";
 import EditOrderModal from "./EditOrderModal";
@@ -253,7 +254,14 @@ export default function OrderBoard() {
                 </p>
               )}
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-sand/60">
-                <span className="font-semibold">{formatPeso(order.totalCents)}</span>
+                <span className="font-semibold">
+                  {formatPeso(order.totalCents)}
+                  {order.discountCents > 0 && (
+                    <span className="ml-2 text-[11px] font-medium px-2 py-0.5 rounded-full bg-brass/20 text-brass-dark">
+                      {discountLabel(order.discountType)} −{formatPeso(order.discountCents)}
+                    </span>
+                  )}
+                </span>
                 <div className="flex gap-3 items-center">
                   <button
                     onClick={() => remove(order)}

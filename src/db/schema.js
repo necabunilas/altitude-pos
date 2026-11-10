@@ -61,6 +61,14 @@ export const orders = sqliteTable("orders", {
   // upgrade; null for cash / manual card.
   paymentProvider: text("payment_provider"),
   paymentRef: text("payment_ref"),
+  // Senior / PWD discount: type ("senior" | "pwd" | null), how many eligible
+  // people out of the party sharing the order, their ID numbers, and the
+  // resulting amount off (kept in sync whenever the items change).
+  discountType: text("discount_type"),
+  discountCount: integer("discount_count").notNull().default(1),
+  discountParty: integer("discount_party").notNull().default(1),
+  discountIdNo: text("discount_id_no").notNull().default(""),
+  discountCents: integer("discount_cents").notNull().default(0),
   // Set when the order is finalized ("Close"); moves it to sales.
   closedAt: integer("closed_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })

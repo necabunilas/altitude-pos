@@ -2,6 +2,7 @@ import { db, schema } from "@/db";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
 import { milkExtra, milkLineName } from "@/lib/milk";
 import { categoryKind } from "@/lib/categoryKind";
+import { discountCents as calcDiscount, DISCOUNTS } from "@/lib/discount";
 
 const { tables, menuCategories, menuItems, orders, orderItems, calls, feedback } =
   schema;
@@ -66,7 +67,9 @@ export async function placeOrder({ tableId, cart, note = "", customerName = "" }
   // Food with a stock count is deducted now; put it back if saving fails.
   await takeStock(lines, byId);
   try {
-    return await saveOrderLines({ tableId, lines, note, cleanName });
+    const saved = await saveOrderLines({ tableId, lines, note, cleanName });
+    await recalcDiscount(saved.id);
+    return saved;
   } catch (e) {
     await restoreStock(lines);
     throw e;
@@ -180,6 +183,50 @@ export function deriveOrderStatus(order) {
   return "placed";
 }
 
+// Subtotal (items) and total (after any senior/PWD discount) for an order.
+function orderTotals(order, items) {
+  const subtotalCents = items.reduce((s, i) => s + i.priceCents * i.qty, 0);
+  return { subtotalCents, totalCents: subtotalCents - (order.discountCents || 0) };
+}
+
+// Re-figure an order's senior/PWD discount from its current items. Called after
+// anything that changes the lines so the stored amount (used by sales totals)
+// never goes stale.
+async function recalcDiscount(orderId) {
+  const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
+  if (!order) return;
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId)).all();
+  const subtotal = items.reduce((s, i) => s + i.priceCents * i.qty, 0);
+  const cents = calcDiscount(subtotal, {
+    type: order.discountType,
+    count: order.discountCount,
+    party: order.discountParty,
+  });
+  if (cents !== order.discountCents) {
+    await db.update(orders).set({ discountCents: cents }).where(eq(orders.id, orderId)).run();
+  }
+}
+
+// Apply, change or remove (type null) the senior/PWD discount on an open order.
+export async function setOrderDiscount(orderId, { type, count = 1, party = 1, idNo = "" } = {}) {
+  if (!(await editableOrder(orderId))) return null;
+  const valid = DISCOUNTS.some((d) => d.value === type);
+  if (type && !valid) throw new Error("Unknown discount.");
+  const p = Math.max(1, Math.min(50, Math.round(Number(party) || 1)));
+  const c = Math.max(1, Math.min(p, Math.round(Number(count) || 1)));
+  await db
+    .update(orders)
+    .set(
+      valid
+        ? { discountType: type, discountCount: c, discountParty: p, discountIdNo: String(idNo || "").trim().slice(0, 80) }
+        : { discountType: null, discountCount: 1, discountParty: 1, discountIdNo: "" }
+    )
+    .where(eq(orders.id, orderId))
+    .run();
+  await recalcDiscount(orderId);
+  return db.select().from(orders).where(eq(orders.id, orderId)).get();
+}
+
 // Orders with their line items, newest first. Optionally filter out closed.
 export async function listOrders({ activeOnly = false } = {}) {
   // "Active" = not yet closed and not cancelled. Filter in SQL so we only pull
@@ -206,7 +253,7 @@ export async function listOrders({ activeOnly = false } = {}) {
       ...o,
       table: tById[o.tableId] || null,
       items: its,
-      totalCents: its.reduce((s, i) => s + i.priceCents * i.qty, 0),
+      ...orderTotals(o, its),
     };
     enriched.status = deriveOrderStatus(enriched);
     return enriched;
@@ -267,7 +314,10 @@ export async function voidItem(itemId) {
   const order = await db.select().from(orders).where(eq(orders.id, item.orderId)).get();
   if (order?.paidAt) throw new Error("Can't void an item on a paid order.");
   const removed = await db.delete(orderItems).where(eq(orderItems.id, itemId)).returning().get();
-  if (removed) await restoreStock([removed]);
+  if (removed) {
+    await restoreStock([removed]);
+    await recalcDiscount(removed.orderId);
+  }
   return removed;
 }
 
@@ -299,11 +349,13 @@ export async function addOrderItem(orderId, { menuItemId, qty, milk }) {
   };
   await takeStock([line], { [item.id]: item });
   try {
-    return await db
+    const added = await db
       .insert(orderItems)
       .values({ ...line, orderId, status: "placed" })
       .returning()
       .get();
+    await recalcDiscount(orderId);
+    return added;
   } catch (e) {
     await restoreStock([line]);
     throw e;
@@ -322,7 +374,9 @@ export async function setOrderItemQty(itemId, qty) {
   } else if (delta < 0) {
     await restoreStock([{ menuItemId: line.menuItemId, qty: -delta }]);
   }
-  return db.update(orderItems).set({ qty: q }).where(eq(orderItems.id, itemId)).returning().get();
+  const updated = await db.update(orderItems).set({ qty: q }).where(eq(orderItems.id, itemId)).returning().get();
+  await recalcDiscount(line.orderId);
+  return updated;
 }
 
 // Name and payment from the Edit order screen. A counter order's name lives on
@@ -374,6 +428,7 @@ export async function removeOrderItem(itemId) {
   if (!others.length) throw new Error("That's the last item. Delete the order instead.");
   await db.delete(orderItems).where(eq(orderItems.id, itemId)).run();
   await restoreStock([line]);
+  await recalcDiscount(line.orderId);
   return line;
 }
 
@@ -466,7 +521,23 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
   if (to) conds.push(lte(orders.closedAt, to));
   const where = and(...conds);
 
-  const [orderRows, tableRows, countRow, revRow, methodRows, catRows] = await Promise.all([
+  // Each order's takings: its items less any senior/PWD discount.
+  const orderNet = sql`(select coalesce(sum(${orderItems.priceCents} * ${orderItems.qty}), 0) from ${orderItems} where ${orderItems.orderId} = ${orders.id}) - ${orders.discountCents}`;
+  // Manila local time of when the order was placed (stored as UTC seconds).
+  const localTs = sql`${orders.createdAt} + 28800`;
+
+  const [
+    orderRows,
+    tableRows,
+    countRow,
+    revRow,
+    methodRows,
+    catRows,
+    discRow,
+    discMethodRows,
+    hourRows,
+    weekdayRows,
+  ] = await Promise.all([
     db.select().from(orders).where(where).orderBy(desc(orders.closedAt)).limit(limit).offset(offset).all(),
     db.select().from(tables).all(),
     db.select({ n: sql`count(*)`.mapWith(Number) }).from(orders).where(where).get(),
@@ -501,6 +572,43 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
       .where(where)
       .groupBy(menuCategories.name)
       .all(),
+    // Senior/PWD discounts given, overall and per tender.
+    db
+      .select({
+        r: sql`coalesce(sum(${orders.discountCents}), 0)`.mapWith(Number),
+        n: sql`coalesce(sum(case when ${orders.discountCents} > 0 then 1 else 0 end), 0)`.mapWith(Number),
+      })
+      .from(orders)
+      .where(where)
+      .get(),
+    db
+      .select({ method: orders.paymentMethod, r: sql`coalesce(sum(${orders.discountCents}), 0)`.mapWith(Number) })
+      .from(orders)
+      .where(where)
+      .groupBy(orders.paymentMethod)
+      .all(),
+    // Busiest hours and weekdays, by when orders were placed (Manila time).
+    db
+      .select({
+        hour: sql`cast(strftime('%H', ${localTs}, 'unixepoch') as integer)`.mapWith(Number),
+        orders: sql`count(*)`.mapWith(Number),
+        r: sql`coalesce(sum(${orderNet}), 0)`.mapWith(Number),
+      })
+      .from(orders)
+      .where(where)
+      .groupBy(sql`1`)
+      .all(),
+    db
+      .select({
+        dow: sql`cast(strftime('%w', ${localTs}, 'unixepoch') as integer)`.mapWith(Number),
+        orders: sql`count(*)`.mapWith(Number),
+        r: sql`coalesce(sum(${orderNet}), 0)`.mapWith(Number),
+        days: sql`count(distinct date(${localTs}, 'unixepoch'))`.mapWith(Number),
+      })
+      .from(orders)
+      .where(where)
+      .groupBy(sql`1`)
+      .all(),
   ]);
 
   const tById = Object.fromEntries(tableRows.map((t) => [t.id, t]));
@@ -514,12 +622,15 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
       ...o,
       table: tById[o.tableId] || null,
       items: its,
-      totalCents: its.reduce((s, i) => s + i.priceCents * i.qty, 0),
+      ...orderTotals(o, its),
     };
   });
   const count = countRow?.n || 0;
   let cashCents = 0, cardCents = 0, qrCents = 0, otherCents = 0;
+  // Tender totals are item sums; take each tender's discounts back out.
+  const discByMethod = Object.fromEntries(discMethodRows.map((m) => [m.method ?? "", m.r]));
   for (const m of methodRows) {
+    m.r -= discByMethod[m.method ?? ""] || 0;
     if (m.method === "cash") cashCents += m.r;
     else if (m.method === "card") cardCents += m.r;
     else if (m.method === "qr") qrCents += m.r;
@@ -540,11 +651,23 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
   const drinkCents = categoryBreakdown
     .filter((c) => c.kind === "drink")
     .reduce((s, c) => s + c.revenueCents, 0);
+  const discountCents = discRow?.r || 0;
+  const openDays = weekdayRows.reduce((s, d) => s + d.days, 0);
   return {
     sales,
     summary: {
       count,
-      revenueCents: revRow?.r || 0,
+      revenueCents: (revRow?.r || 0) - discountCents,
+      // Category figures are before discounts; this is what was taken off.
+      discountCents,
+      discountCount: discRow?.n || 0,
+      openDays,
+      byHour: hourRows
+        .map((h) => ({ hour: h.hour, orders: h.orders, revenueCents: h.r }))
+        .sort((a, b) => a.hour - b.hour),
+      byWeekday: weekdayRows
+        .map((d) => ({ dow: d.dow, orders: d.orders, revenueCents: d.r, days: d.days }))
+        .sort((a, b) => ((a.dow + 6) % 7) - ((b.dow + 6) % 7)),
       cashCents,
       cardCents,
       qrCents,
@@ -637,7 +760,7 @@ export async function listTables() {
 // Staff counter/bar order for walk-ins with no table QR. Creates a standalone
 // hidden table (active:false, so it never shows a QR) so the order is billed
 // and closed independently on the board, then places the order against it.
-export async function placeCounterOrder({ label, cart, note = "", paymentMethod = null }) {
+export async function placeCounterOrder({ label, cart, note = "", paymentMethod = null, discount = null }) {
   const clean = String(label || "").trim().slice(0, 40) || "Counter";
   const slug = `counter-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const table = await db
@@ -653,6 +776,8 @@ export async function placeCounterOrder({ label, cart, note = "", paymentMethod 
     await db.delete(tables).where(eq(tables.id, table.id)).run();
     throw e;
   }
+  // Senior/PWD discount chosen at the counter, applied before payment.
+  if (discount?.type) await setOrderDiscount(order.id, discount);
   // Counter/bar is pay-first: if a method is chosen, mark it paid right away.
   // The order still stays open on the board until it is served and closed.
   const method = ["cash", "card", "qr"].includes(paymentMethod) ? paymentMethod : null;

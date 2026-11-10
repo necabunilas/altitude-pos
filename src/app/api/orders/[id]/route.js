@@ -1,8 +1,8 @@
-import { cancelOrder, deleteOrder, updateOrderDetails } from "@/lib/data";
+import { cancelOrder, deleteOrder, setOrderDiscount, updateOrderDetails } from "@/lib/data";
 import { isStaffAuthed } from "@/lib/auth";
 
 // Order-level actions: cancel the whole order, or edit its name / payment
-// type from the Edit order screen.
+// type / senior-PWD discount from the Edit order screen.
 export async function PATCH(request, { params }) {
   if (!(await isStaffAuthed())) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,6 +19,16 @@ export async function PATCH(request, { params }) {
       const order = await updateOrderDetails(Number(id), {
         name: body.name,
         paymentMethod: body.paymentMethod,
+      });
+      if (!order) return Response.json({ error: "Not found" }, { status: 404 });
+      return Response.json({ ok: true, order });
+    }
+    if (body?.action === "discount") {
+      const order = await setOrderDiscount(Number(id), {
+        type: body.type || null,
+        count: body.count,
+        party: body.party,
+        idNo: body.idNo,
       });
       if (!order) return Response.json({ error: "Not found" }, { status: 404 });
       return Response.json({ ok: true, order });

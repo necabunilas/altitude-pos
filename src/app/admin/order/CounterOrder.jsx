@@ -7,6 +7,8 @@ import { formatPeso } from "@/lib/money";
 import { CARD_ENABLED } from "@/lib/flags";
 import MilkPicker from "@/app/MilkPicker";
 import { cartKey, parseCartKey, milkExtra, milkLineName } from "@/lib/milk";
+import { discountCents, discountLabel } from "@/lib/discount";
+import DiscountFields, { NO_DISCOUNT } from "../DiscountFields";
 
 // Display names for the tender chosen at the counter.
 const METHOD_LABEL = { cash: "Cash", card: "Card", qr: "QR" };
@@ -28,6 +30,7 @@ export default function CounterOrder({ menu }) {
   const [payMethod, setPayMethod] = useState("cash"); // "cash" | "card" | "later"
   const [received, setReceived] = useState(""); // cash handed over, in pesos
   const [cashOpen, setCashOpen] = useState(false); // cash tendered/change step before placing
+  const [discount, setDiscount] = useState(NO_DISCOUNT); // senior / PWD
 
   const itemsById = useMemo(() => {
     const m = {};
@@ -51,7 +54,9 @@ export default function CounterOrder({ menu }) {
       };
     })
     .filter(Boolean);
-  const total = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
+  const subtotal = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
+  const discountOff = discountCents(subtotal, discount);
+  const total = subtotal - discountOff;
   const count = lines.reduce((s, l) => s + l.qty, 0);
 
   // Cash tendered + change, entered in the cash step before the order is placed.
@@ -118,6 +123,7 @@ export default function CounterOrder({ menu }) {
           label: name,
           note,
           paymentMethod: isLater ? null : payMethod,
+          discount: discount.type ? discount : null,
           cart: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty, milk: l.milk })),
         }),
       });
@@ -138,6 +144,7 @@ export default function CounterOrder({ menu }) {
         setCart({});
         setName("");
         setNote("");
+        setDiscount(NO_DISCOUNT);
         setShowCart(true);
       } else {
         setCashOpen(false);
@@ -299,6 +306,21 @@ export default function CounterOrder({ menu }) {
 
         <div className="max-w-4xl mx-auto p-3 space-y-2 lg:max-w-none lg:mx-0 lg:w-full lg:p-4 lg:space-y-3 lg:border-t lg:border-sand">
           {/* Total (side panel only; phones show it on the Place button) */}
+          {discountOff > 0 && (
+            <div className="hidden lg:block text-sm space-y-0.5">
+              <div className="flex justify-between text-mocha">
+                <span>Subtotal</span>
+                <span className="tabular-nums">{formatPeso(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-brass-dark">
+                <span>
+                  {discountLabel(discount.type)} 20%
+                  {discount.party > 1 && ` (${discount.count} of ${discount.party})`}
+                </span>
+                <span className="tabular-nums">−{formatPeso(discountOff)}</span>
+              </div>
+            </div>
+          )}
           <div className="hidden lg:flex items-baseline justify-between">
             <span className="text-mocha">Total</span>
             <span className="font-black text-2xl tabular-nums">{formatPeso(total)}</span>
@@ -317,6 +339,7 @@ export default function CounterOrder({ menu }) {
               className="flex-1 min-w-[140px] border border-ink px-3 py-2 text-sm bg-white focus:outline-none focus:border-brass"
             />
           </div>
+          <DiscountFields value={discount} onChange={setDiscount} />
           {/* Payment choice: pay now, or pay later (billed from the board) */}
           <div className="flex gap-2">
             {[
@@ -379,7 +402,10 @@ export default function CounterOrder({ menu }) {
           <div className="relative bg-white border border-ink w-full max-w-sm p-6">
             <div className="text-xs uppercase tracking-[0.15em] text-brass-dark">Cash payment</div>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-mocha">{name.trim()}</span>
+              <span className="text-mocha">
+                {name.trim()}
+                {discountOff > 0 && ` · ${discountLabel(discount.type)} −${formatPeso(discountOff)}`}
+              </span>
               <span className="font-black text-3xl text-espresso tabular-nums">{formatPeso(total)}</span>
             </div>
 
