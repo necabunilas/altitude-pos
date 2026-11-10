@@ -263,7 +263,7 @@ export default function CounterOrder({ menu }) {
       </div>
 
       {/* Checkout: bottom bar on phones, sticky side panel on wide screens */}
-      <div className="fixed bottom-0 inset-x-0 z-20 bg-cream/95 backdrop-blur border-t border-sand print:hidden lg:sticky lg:top-4 lg:bottom-auto lg:inset-x-auto lg:z-auto lg:bg-white lg:backdrop-blur-none lg:border lg:border-ink lg:flex lg:flex-col lg:h-[calc(100vh-6rem)]">
+      <div className="fixed bottom-0 inset-x-0 z-20 bg-cream/95 backdrop-blur border-t border-sand print:hidden lg:sticky lg:top-4 lg:bottom-auto lg:inset-x-auto lg:z-auto lg:bg-white lg:backdrop-blur-none lg:border lg:border-ink lg:flex lg:flex-col lg:h-[calc(100dvh-8rem)]">
         {/* Order lines: toggled on phones, always shown on the side panel */}
         <div
           className={`max-w-4xl mx-auto px-3 pt-3 max-h-[40vh] overflow-y-auto lg:max-w-none lg:mx-0 lg:w-full lg:px-4 lg:pt-4 lg:max-h-none lg:flex-1 lg:min-h-0 ${
