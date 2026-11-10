@@ -59,6 +59,12 @@ export async function GET(request) {
     if (summary.discountCents) {
       lines.push(["Senior/PWD discounts", "", summary.discountCount, (-summary.discountCents / 100).toFixed(2)].map(csvCell).join(","));
     }
+    if (summary.expenseCents) {
+      lines.push(["Expenses", "", "", (-summary.expenseCents / 100).toFixed(2)].map(csvCell).join(","));
+      lines.push(["  paid in cash", "", "", (-summary.expenseCashCents / 100).toFixed(2)].map(csvCell).join(","));
+      lines.push(["  paid by QR", "", "", (-summary.expenseQrCents / 100).toFixed(2)].map(csvCell).join(","));
+      lines.push(["Net", "", "", ((summary.revenueCents - summary.expenseCents) / 100).toFixed(2)].map(csvCell).join(","));
+    }
   }
 
   const csv = lines.join("\n");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { formatPeso } from "@/lib/money";
 import DeleteOrderModal from "../DeleteOrderModal";
 import { orderLabel } from "@/lib/orderLabel";
@@ -71,6 +72,8 @@ function shiftRange(unit, from, to, dir) {
   const len = Math.round((parse(to) - parse(from)) / 86400000) + 1;
   return { from: addDays(from, len * dir), to: minStr(addDays(to, len * dir), today) };
 }
+
+const signedPeso = (c) => (c < 0 ? "−" : "") + formatPeso(Math.abs(c));
 
 function shortDate(s, withWeekday = false) {
   return parse(s).toLocaleDateString("en-PH", {
@@ -171,6 +174,7 @@ export default function SalesView() {
     { key: "month", label: "This month" },
   ];
   const avgCents = summary.count ? Math.round(summary.revenueCents / summary.count) : 0;
+  const netCents = (summary.revenueCents || 0) - (summary.expenseCents || 0);
 
   function exportCsv() {
     const { from: f, to: t } = dayRange(from, to);
@@ -279,7 +283,7 @@ export default function SalesView() {
 
       {/* Summary */}
       {/* Stacked on phones so a 5+ digit revenue has room; side by side from sm. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="bg-white border border-ink p-4 min-w-0">
           <div className="text-xs uppercase tracking-[0.15em] text-brass-dark">Revenue</div>
           <div className="font-display text-3xl text-espresso mt-1 tabular-nums break-words">
@@ -312,6 +316,39 @@ export default function SalesView() {
           <div className="text-xs uppercase tracking-[0.15em] text-brass-dark">Orders</div>
           <div className="font-display text-3xl text-espresso mt-1">{summary.count}</div>
           <div className="text-xs text-mocha mt-1.5">Avg {formatPeso(avgCents)} / order</div>
+        </div>
+        {/* Net = revenue less expenses entered for the same days. */}
+        <div className="bg-white border border-ink p-4 min-w-0 sm:col-span-2 lg:col-span-1">
+          <div className="text-xs uppercase tracking-[0.15em] text-brass-dark">Net</div>
+          <div
+            className={`font-display text-3xl mt-1 tabular-nums break-words ${
+              netCents < 0 ? "text-red-700" : netCents > 0 ? "text-emerald-700" : "text-espresso"
+            }`}
+          >
+            {netCents < 0 && "−"}
+            {formatPeso(Math.abs(netCents))}
+          </div>
+          <div className="text-xs text-mocha mt-2 space-y-0.5">
+            <div className="flex justify-between gap-3">
+              <Link href="/admin/expenses" className="hover:underline">
+                Expenses
+              </Link>
+              <span className="tabular-nums">−{formatPeso(summary.expenseCents || 0)}</span>
+            </div>
+            {/* Cash left from the day's takings once cash expenses are paid. */}
+            <div className="flex justify-between gap-3 text-mocha/70">
+              <span>💵 Cash in − cash out</span>
+              <span className="tabular-nums">
+                {signedPeso((summary.cashCents || 0) - (summary.expenseCashCents || 0))}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3 text-mocha/70">
+              <span>📱 QR in − QR out</span>
+              <span className="tabular-nums">
+                {signedPeso((summary.qrCents || 0) - (summary.expenseQrCents || 0))}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 

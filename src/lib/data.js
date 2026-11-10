@@ -4,7 +4,7 @@ import { milkExtra, milkLineName } from "@/lib/milk";
 import { categoryKind } from "@/lib/categoryKind";
 import { discountCents as calcDiscount, DISCOUNTS } from "@/lib/discount";
 
-const { tables, menuCategories, menuItems, orders, orderItems, calls, feedback } =
+const { tables, menuCategories, menuItems, orders, orderItems, calls, feedback, expenses } =
   schema;
 
 // libSQL is async — every helper here returns a Promise and must be awaited.
@@ -537,6 +537,7 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
     discMethodRows,
     hourRows,
     weekdayRows,
+    spent,
   ] = await Promise.all([
     db.select().from(orders).where(where).orderBy(desc(orders.closedAt)).limit(limit).offset(offset).all(),
     db.select().from(tables).all(),
@@ -609,6 +610,7 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
       .where(where)
       .groupBy(sql`1`)
       .all(),
+    sumExpenses({ from: from && manilaDay(from), to: to && manilaDay(to) }),
   ]);
 
   const tById = Object.fromEntries(tableRows.map((t) => [t.id, t]));
@@ -661,6 +663,10 @@ export async function listSales({ from, to, limit = 50, offset = 0 } = {}) {
       // Category figures are before discounts; this is what was taken off.
       discountCents,
       discountCount: discRow?.n || 0,
+      // Expenses entered for the same days, for net = revenue - expenses.
+      expenseCents: spent.total,
+      expenseCashCents: spent.cash,
+      expenseQrCents: spent.qr,
       openDays,
       byHour: hourRows
         .map((h) => ({ hour: h.hour, orders: h.orders, revenueCents: h.r }))
@@ -843,4 +849,66 @@ export async function deleteCategory(id) {
   const items = await db.select().from(menuItems).where(eq(menuItems.categoryId, id)).all();
   if (items.length) throw new Error("Remove the items in this category first.");
   return db.delete(menuCategories).where(eq(menuCategories.id, id)).returning().get();
+}
+// ---- Expenses (staff) ----
+// One total per entry ("Milk restock", "Electricity"), dated by the day paid.
+
+// A Date as its Manila calendar day, yyyy-mm-dd.
+function manilaDay(d) {
+  return new Date(new Date(d).getTime() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+}
+const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ""));
+
+function cleanExpense({ spentOn, description, amountCents, paymentMethod }) {
+  const desc = String(description || "").trim().slice(0, 120);
+  const cents = Math.round(Number(amountCents));
+  if (!desc) throw new Error("Enter what the expense was for.");
+  if (!Number.isFinite(cents) || cents <= 0) throw new Error("Enter the amount.");
+  if (!isDay(spentOn)) throw new Error("Pick a date.");
+  const method = paymentMethod === "qr" ? "qr" : "cash";
+  return { spentOn, description: desc, amountCents: cents, paymentMethod: method };
+}
+
+function expenseRange({ from, to } = {}) {
+  const conds = [];
+  if (isDay(from)) conds.push(gte(expenses.spentOn, from));
+  if (isDay(to)) conds.push(lte(expenses.spentOn, to));
+  return conds.length ? and(...conds) : undefined;
+}
+
+// Expenses between two yyyy-mm-dd days (inclusive), newest first.
+export async function listExpenses({ from, to } = {}) {
+  return db
+    .select()
+    .from(expenses)
+    .where(expenseRange({ from, to }))
+    .orderBy(desc(expenses.spentOn), desc(expenses.id))
+    .all();
+}
+
+// Totals spent in the range, overall and split by cash / QR.
+export async function sumExpenses({ from, to } = {}) {
+  const rows = await db
+    .select({
+      method: expenses.paymentMethod,
+      r: sql`coalesce(sum(${expenses.amountCents}), 0)`.mapWith(Number),
+    })
+    .from(expenses)
+    .where(expenseRange({ from, to }))
+    .groupBy(expenses.paymentMethod)
+    .all();
+  const by = Object.fromEntries(rows.map((r) => [r.method, r.r]));
+  return { total: rows.reduce((s, r) => s + r.r, 0), cash: by.cash || 0, qr: by.qr || 0 };
+}
+
+export async function createExpense(input) {
+  return db.insert(expenses).values(cleanExpense(input)).returning().get();
+}
+
+export async function updateExpense(id, input) {
+  return db.update(expenses).set(cleanExpense(input)).where(eq(expenses.id, id)).returning().get();
+}
+
+export async function deleteExpense(id) {
+  return db.delete(expenses).where(eq(expenses.id, id)).returning().get();
 }

@@ -120,3 +120,16 @@ export const feedback = sqliteTable("feedback", {
     .notNull()
     .default(sql`(unixepoch())`),
 });
+// Money spent (supplies, bills, salary…): one total per entry, no line items.
+// spentOn is the local day it was paid, yyyy-mm-dd.
+export const expenses = sqliteTable("expenses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  spentOn: text("spent_on").notNull(),
+  description: text("description").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  // Paid from the cash drawer or by QR (GCash/Maya): "cash" | "qr".
+  paymentMethod: text("payment_method").notNull().default("cash"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});

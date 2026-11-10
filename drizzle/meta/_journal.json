@@ -85,6 +85,13 @@
       "when": 1794287117510,
       "tag": "0011_order_discount",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794289933975,
+      "tag": "0012_expenses",
+      "breakpoints": true
     }
   ]
 }

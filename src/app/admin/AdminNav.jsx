@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/admin/order", label: "Counter" },
   { href: "/admin", label: "Orders" },
   { href: "/admin/sales", label: "Sales" },
+  { href: "/admin/expenses", label: "Expenses" },
   { href: "/admin/menu", label: "Menu" },
   { href: "/admin/feedback", label: "Feedback" },
   { href: "/admin/tables", label: "QR Codes" },
