@@ -41,7 +41,7 @@ export const MENU = [
       { name: "Dark Rye Cookies", price: 50, description: "" },
       { name: "Ssamjang Biscuit", price: 130, description: "With hot honey." },
       { name: "Butter Croissant", price: 120, description: "Flaky, golden and all butter. The classic." },
-      { name: "Pain au Chocolat", price: 140, description: "Buttery croissant dough wrapped around dark chocolate." },
+      { name: "Pain au Chocolat", price: 140, description: "Dark chocolate wrapped in croissant dough." },
       { name: "Honey Butter Croissant", price: 110, description: "Flaky butter croissant glazed with honey. Sweet, golden and sticky in the best way." },
       { name: "Tomato Ricotta Danish", price: 150, description: "Flaky danish pastry with creamy ricotta and roasted tomatoes." },
       { name: "Ham and Cheese Croissant", price: 150, description: "Buttery croissant filled with ham and melted cheese." },

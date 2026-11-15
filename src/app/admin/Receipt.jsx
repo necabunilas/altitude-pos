@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPeso, groupItems } from "@/lib/money";
-import { RECEIPT_BUSINESS, VAT_RATE } from "@/lib/brand";
+import { RECEIPT_BUSINESS } from "@/lib/brand";
 import { discountLabel } from "@/lib/discount";
 
 // A single-order receipt, styled like a thermal-printer slip. Wrap in
@@ -22,11 +22,6 @@ export default function Receipt({ order, printable = true }) {
   const total = order.totalCents ?? subtotal - discount;
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
   const paid = !!order.paidAt;
-  const method = order.paymentMethod;
-
-  // Prices are VAT-inclusive: back out the VATable sales and 12% VAT amount.
-  const vatSales = Math.round(total / (1 + VAT_RATE));
-  const vatAmount = total - vatSales;
 
   const Rule = () => <div className="border-t border-dashed border-neutral-500 my-2" />;
   const Row = ({ label, value, strong }) => (
@@ -98,18 +93,9 @@ export default function Receipt({ order, printable = true }) {
 
       <Rule />
 
-      {/* VAT breakdown (informational; prices are VAT-inclusive) */}
-      <Row label="VATable Sales" value={formatPeso(vatSales)} />
-      <Row label="VAT-Exempt Sales" value={formatPeso(0)} />
-      <Row label="Zero-Rated Sales" value={formatPeso(0)} />
-      <Row label={`VAT (${Math.round(VAT_RATE * 100)}%)`} value={formatPeso(vatAmount)} />
-
-      <Rule />
-
       {paid ? (
         <>
           <div className="text-center font-bold tracking-widest">*** PAID ***</div>
-          {method ? <Row label="Payment" value={method === "card" ? "Card" : "Cash"} /> : null}
           {order.paymentRef ? (
             <div>
               <span>Ref No.</span>
