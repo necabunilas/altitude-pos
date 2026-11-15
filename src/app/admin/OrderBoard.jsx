@@ -281,7 +281,7 @@ export default function OrderBoard() {
                       paid ? "bg-espresso" : "bg-emerald-600"
                     }`}
                   >
-                    {paid ? "See bill" : "Bill"}
+                    {!paid ? "Bill" : order.status === "served" ? "Close" : "See bill"}
                   </button>
                 </div>
               </div>
